@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chat_backend}
+      POSTGRES_USER: ${POSTGRES_USER:-chat_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chat_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-chat_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-chat_password}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-chat_backend}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping').ok"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pg-service:
+    build:
+      context: ./services/pg-service
+    environment:
+      NODE_ENV: production
+      PG_SERVICE_PORT: ${PG_SERVICE_PORT:-3001}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://chat_user:chat_password@postgres:5432/chat_backend}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-service:
+    build:
+      context: ./services/mongo-service
+    environment:
+      NODE_ENV: production
+      MONGO_SERVICE_PORT: ${MONGO_SERVICE_PORT:-3002}
+      MONGO_URL: ${MONGO_URL:-mongodb://chat_admin:chat_password@mongo:27017/chat_backend?authSource=admin}
+    ports:
+      - "3002:3002"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    environment:
+      NODE_ENV: production
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT:-3000}
+      PG_SERVICE_URL: ${PG_SERVICE_URL:-http://pg-service:3001}
+      MONGO_SERVICE_URL: ${MONGO_SERVICE_URL:-http://mongo-service:3002}
+    ports:
+      - "3000:3000"
+    depends_on:
+      pg-service:
+        condition: service_healthy
+      mongo-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  mongo_data:

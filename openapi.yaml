@@ -1,0 +1,53 @@
+openapi: 3.0.3
+info:
+  title: Chat Backend API
+  version: 0.1.0
+servers:
+  - url: http://localhost:3000
+paths:
+  /health:
+    get:
+      summary: API Gateway health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "500":
+          $ref: "#/components/responses/Error"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: api-gateway
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - code
+        - details
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          nullable: true
+  responses:
+    Error:
+      description: API error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

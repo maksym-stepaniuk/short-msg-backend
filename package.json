@@ -1,0 +1,14 @@
+{
+  "name": "chat-backend",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "services/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev:gateway": "npm run dev --workspace @chat/api-gateway",
+    "dev:pg": "npm run dev --workspace @chat/pg-service",
+    "dev:mongo": "npm run dev --workspace @chat/mongo-service"
+  }
+}
