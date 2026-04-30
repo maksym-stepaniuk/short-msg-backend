@@ -40,3 +40,24 @@ Każdy serwis zwraca błędy API bez stack trace w formacie:
 ## Przepływ danych
 
 Docelowo klient wysyła żądania do `api-gateway`. Gateway komunikuje się HTTP z `pg-service` dla metadanych PostgreSQL oraz z `mongo-service` dla treści wiadomości, indeksów i agregacji MongoDB.
+
+## T2 Knex.js
+
+`pg-service` używa Knex jako dodatkowego narzędzia obok Prisma:
+
+- migracje Knex znajdują się w `services/pg-service/knex/migrations` i tworzą pomocniczy moduł `conversation_search_audit`;
+- seedy domenowe znajdują się w `services/pg-service/knex/seeds` i dodają przykładowych użytkowników, konwersacje oraz członkostwa;
+- `GET /conversations/search` buduje dynamiczne filtry przez Knex Query Builder, bez sklejania SQL stringów.
+
+Komendy:
+
+```bash
+npm run knex:migrate --workspace @chat/pg-service
+npm run knex:seed --workspace @chat/pg-service
+```
+
+Przykład:
+
+```bash
+curl "http://localhost:3001/conversations/search?type=group&title=study&limit=10"
+```
