@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConversationType {
+  direct
+  group
+}
+
+enum MemberRole {
+  admin
+  member
+}
+
+enum DeliveryStatus {
+  accepted
+  delivered
+  failed
+}
+
+model User {
+  id              String               @id @default(uuid()) @db.Uuid
+  email           String               @unique
+  username        String
+  createdAt       DateTime             @default(now())
+  deletedAt       DateTime?
+  createdConversations Conversation[]  @relation("ConversationCreator")
+  memberships     ConversationMember[]
+  messagePointers MessagePointer[]     @relation("MessageAuthor")
+
+  @@map("users")
+}
+
+model Conversation {
+  id             String               @id @default(uuid()) @db.Uuid
+  type           ConversationType
+  title          String?
+  createdById    String               @db.Uuid
+  lastMessageAt  DateTime?
+  lastSeq        Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  createdBy      User                 @relation("ConversationCreator", fields: [createdById], references: [id])
+  members        ConversationMember[]
+  messagePointers MessagePointer[]
+
+  @@map("conversations")
+}
+
+model ConversationMember {
+  conversationId String       @db.Uuid
+  userId         String       @db.Uuid
+  role           MemberRole   @default(member)
+  joinedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@id([conversationId, userId])
+  @@map("conversation_members")
+}
+
+model MessagePointer {
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @db.Uuid
+  seq            Int
+  mongoId        String         @unique
+  authorId       String         @db.Uuid
+  deliveryStatus DeliveryStatus @default(accepted)
+  createdAt      DateTime       @default(now())
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author         User           @relation("MessageAuthor", fields: [authorId], references: [id])
+
+  @@unique([conversationId, seq])
+  @@map("message_pointers")
+}
