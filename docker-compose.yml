@@ -9,6 +9,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - chat_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -25,6 +27,8 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    networks:
+      - chat_network
     healthcheck:
       test:
         [
@@ -47,6 +51,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://chat_user:chat_password@postgres:5432/chat_backend}
     ports:
       - "3001:3001"
+    networks:
+      - chat_network
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,9 +74,11 @@ services:
     environment:
       NODE_ENV: production
       MONGO_SERVICE_PORT: ${MONGO_SERVICE_PORT:-3002}
-      MONGO_URL: ${MONGO_URL:-mongodb://chat_admin:chat_password@mongo:27017/chat_backend?authSource=admin}
+      MONGO_URI: ${MONGO_URI:-mongodb://chat_admin:chat_password@mongo:27017/chat_backend?authSource=admin}
     ports:
       - "3002:3002"
+    networks:
+      - chat_network
     depends_on:
       mongo:
         condition: service_healthy
@@ -96,6 +104,8 @@ services:
       MONGO_SERVICE_URL: ${MONGO_SERVICE_URL:-http://mongo-service:3002}
     ports:
       - "3000:3000"
+    networks:
+      - chat_network
     depends_on:
       pg-service:
         condition: service_healthy
@@ -116,3 +126,7 @@ services:
 volumes:
   postgres_data:
   mongo_data:
+
+networks:
+  chat_network:
+    driver: bridge

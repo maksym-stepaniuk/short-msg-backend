@@ -17,6 +17,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Komenda uruchamia kontenery `api-gateway`, `pg-service`, `mongo-service`, `postgres` oraz `mongo` bez dodatkowych kroków ręcznych.
+
 Health endpointy:
 
 - `GET http://localhost:3000/health`
