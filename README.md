@@ -104,3 +104,13 @@ Zapytania używają parametrów PostgreSQL (`$1`, `$2`). Błędy SQLSTATE są ma
 - `MessageDraft.preview()` zwraca pierwsze 50 znaków treści;
 - `ActivityEvent.findRecentForConversation(conversationId, limit)` zwraca ostatnie zdarzenia;
 - `GET /drafts/:id/with-activity` używa `populate("lastActivityEvent")`.
+
+## T7 Aggregation Pipeline
+
+`mongo-service` udostępnia endpointy analityczne wykonywane w MongoDB przez Aggregation Pipeline:
+
+- `GET /analytics/messages-per-day?conversationId=&from=&to=` zaczyna od `$match` po `conversationId` i `createdAt`, korzystając z indeksu `{ conversationId: 1, createdAt: -1 }`;
+- `GET /analytics/messages-per-conversation?from=&to=` zaczyna od `$match` po `createdAt`, korzystając z indeksu `{ createdAt: -1 }`;
+- pipeline używają `$match`, `$group`, `$project`, `$sort` oraz `$lookup`;
+- `$lookup` łączy wyniki z kolekcją `activityevents`, aby zwrócić `lastActivityType`;
+- agregacja jest wykonywana w bazie, bez pobierania wszystkich dokumentów do Node.js.

@@ -40,6 +40,12 @@ export const ensureMessageIndexes = async () => {
         createdAt: -1
       },
       name: "messages_author_created_at_idx"
+    },
+    {
+      key: {
+        createdAt: -1
+      },
+      name: "messages_created_at_idx"
     }
   ]);
 };

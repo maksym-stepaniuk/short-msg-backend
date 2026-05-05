@@ -1,6 +1,7 @@
 import express from "express";
 import { HttpError } from "./errors/httpError";
 import { errorHandler } from "./middleware/errorHandler";
+import { analyticsRouter } from "./routes/analytics";
 import { healthRouter } from "./routes/health";
 import { messagesRouter } from "./routes/messages";
 import { mongooseDomainRouter } from "./routes/mongooseDomain";
@@ -10,6 +11,7 @@ export const createApp = () => {
 
   app.use(express.json());
   app.use(healthRouter);
+  app.use(analyticsRouter);
   app.use(messagesRouter);
   app.use(mongooseDomainRouter);
 
