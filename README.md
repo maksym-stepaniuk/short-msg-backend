@@ -61,3 +61,14 @@ Przykład:
 ```bash
 curl "http://localhost:3001/conversations/search?type=group&title=study&limit=10"
 ```
+
+## T1 pg
+
+`pg-service` używa natywnego sterownika `pg` w module `src/db/pgPool.ts`. Pool jest singletonem i korzysta z `DATABASE_URL`.
+
+Endpointy demonstracyjne:
+
+- `GET /pg/users/by-email?email=raw@example.test`
+- `POST /pg/users-raw`
+
+Zapytania używają parametrów PostgreSQL (`$1`, `$2`). Błędy SQLSTATE są mapowane do formatu `{ error, code, details }`, np. duplikat email zwraca `409` i `PG_UNIQUE_VIOLATION`.

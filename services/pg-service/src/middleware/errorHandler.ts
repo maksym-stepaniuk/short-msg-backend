@@ -1,8 +1,20 @@
 import type { ErrorRequestHandler } from "express";
 import { HttpError } from "../errors/httpError";
+import { mapPgError } from "../errors/pgErrors";
 import { mapPrismaError } from "../errors/prismaErrors";
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  const pgError = mapPgError(err);
+
+  if (pgError) {
+    res.status(pgError.statusCode).json({
+      error: pgError.message,
+      code: pgError.code,
+      details: pgError.details
+    });
+    return;
+  }
+
   const prismaError = mapPrismaError(err);
 
   if (prismaError) {
