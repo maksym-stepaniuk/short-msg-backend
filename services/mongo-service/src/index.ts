@@ -1,11 +1,12 @@
 import { createApp } from "./app";
 import { closeMongo } from "./db/mongoClient";
 import { ensureMessageIndexes } from "./db/messagesCollection";
+import { closeMongoose, connectMongoose } from "./db/mongoose";
 
 const port = Number(process.env.MONGO_SERVICE_PORT ?? 3002);
 const app = createApp();
 
-ensureMessageIndexes().then(() => {
+Promise.all([ensureMessageIndexes(), connectMongoose()]).then(() => {
   app.listen(port, () => {
     console.log(`mongo-service listening on port ${port}`);
   });
@@ -15,6 +16,7 @@ ensureMessageIndexes().then(() => {
 });
 
 const shutdown = async () => {
+  await closeMongoose();
   await closeMongo();
   process.exit(0);
 };

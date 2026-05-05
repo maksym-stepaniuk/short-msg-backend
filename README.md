@@ -92,3 +92,15 @@ Zapytania używają parametrów PostgreSQL (`$1`, `$2`). Błędy SQLSTATE są ma
 - kolekcja `messages` przechowuje treść wiadomości oraz zagnieżdżone metadane załączników;
 - indeksy `{ conversationId: 1, seq: 1 }`, `{ conversationId: 1, createdAt: -1 }`, `{ body: "text" }` i `{ authorId: 1, createdAt: -1 }` są tworzone przy starcie serwisu;
 - endpointy `POST /messages`, `GET /messages/:id`, `GET /conversations/:conversationId/messages`, `GET /messages/search`, `PATCH /messages/:id`, `DELETE /messages/:id` używają operatorów MongoDB `$gt`, `$lt`, `$text`, `$in` i `$set`.
+
+## T6 Mongoose
+
+`mongo-service` używa Mongoose jako osobnego modułu domenowego, niezależnego od kolekcji `messages` obsługiwanej natywnym sterownikiem:
+
+- schematy `ActivityEvent` i `MessageDraft` znajdują się w `services/mongo-service/src/models/mongoose`;
+- `MessageDraft.attachments` jest tablicą subdokumentów z walidacją rozmiaru pliku;
+- custom validators sprawdzają typ zdarzenia, treść draftu i rozmiar załączników;
+- pre hooki ustawiają `updatedAt` dla draftów i `createdAt` dla zdarzeń aktywności;
+- `MessageDraft.preview()` zwraca pierwsze 50 znaków treści;
+- `ActivityEvent.findRecentForConversation(conversationId, limit)` zwraca ostatnie zdarzenia;
+- `GET /drafts/:id/with-activity` używa `populate("lastActivityEvent")`.

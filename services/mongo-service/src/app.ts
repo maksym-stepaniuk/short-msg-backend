@@ -3,6 +3,7 @@ import { HttpError } from "./errors/httpError";
 import { errorHandler } from "./middleware/errorHandler";
 import { healthRouter } from "./routes/health";
 import { messagesRouter } from "./routes/messages";
+import { mongooseDomainRouter } from "./routes/mongooseDomain";
 
 export const createApp = () => {
   const app = express();
@@ -10,6 +11,7 @@ export const createApp = () => {
   app.use(express.json());
   app.use(healthRouter);
   app.use(messagesRouter);
+  app.use(mongooseDomainRouter);
 
   app.use((_req, _res, next) => {
     next(new HttpError(404, "ROUTE_NOT_FOUND", "Route not found"));
