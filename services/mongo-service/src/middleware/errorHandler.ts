@@ -1,7 +1,19 @@
 import type { ErrorRequestHandler } from "express";
 import { HttpError } from "../errors/httpError";
+import { mapMongoError } from "../errors/mongoErrors";
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  const mongoError = mapMongoError(err);
+
+  if (mongoError) {
+    res.status(mongoError.statusCode).json({
+      error: mongoError.message,
+      code: mongoError.code,
+      details: mongoError.details
+    });
+    return;
+  }
+
   if (err instanceof HttpError) {
     res.status(err.statusCode).json({
       error: err.message,

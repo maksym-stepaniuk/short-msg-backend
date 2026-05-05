@@ -82,3 +82,13 @@ Zapytania używają parametrów PostgreSQL (`$1`, `$2`). Błędy SQLSTATE są ma
 - `POST /sequelize/receipts-with-audit` tworzy audit log i delivery receipt w managed transaction;
 - `GET /sequelize/audit-logs/:conversationId` używa eager loading przez `include`;
 - hooki domenowe ustawiają timestampy delivery/read i normalizują `action` do uppercase.
+
+## T5 MongoDB Native Driver
+
+`mongo-service` używa natywnego sterownika MongoDB:
+
+- singleton `MongoClient` znajduje się w `services/mongo-service/src/db/mongoClient.ts`;
+- połączenie jest zamykane przy `SIGINT` i `SIGTERM`;
+- kolekcja `messages` przechowuje treść wiadomości oraz zagnieżdżone metadane załączników;
+- indeksy `{ conversationId: 1, seq: 1 }`, `{ conversationId: 1, createdAt: -1 }`, `{ body: "text" }` i `{ authorId: 1, createdAt: -1 }` są tworzone przy starcie serwisu;
+- endpointy `POST /messages`, `GET /messages/:id`, `GET /conversations/:conversationId/messages`, `GET /messages/search`, `PATCH /messages/:id`, `DELETE /messages/:id` używają operatorów MongoDB `$gt`, `$lt`, `$text`, `$in` i `$set`.
