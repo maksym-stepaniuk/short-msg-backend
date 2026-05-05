@@ -72,3 +72,13 @@ Endpointy demonstracyjne:
 - `POST /pg/users-raw`
 
 Zapytania używają parametrów PostgreSQL (`$1`, `$2`). Błędy SQLSTATE są mapowane do formatu `{ error, code, details }`, np. duplikat email zwraca `409` i `PG_UNIQUE_VIOLATION`.
+
+## T3 Sequelize v6
+
+`pg-service` używa Sequelize v6 w osobnym module domenowym delivery/audit, poza podstawową logiką Prisma:
+
+- modele `DeliveryReceipt` i `ConversationAuditLog` znajdują się w `services/pg-service/src/modules/sequelize`;
+- tabele są tworzone przez migrację Knex `create_sequelize_delivery_audit_tables`;
+- `POST /sequelize/receipts-with-audit` tworzy audit log i delivery receipt w managed transaction;
+- `GET /sequelize/audit-logs/:conversationId` używa eager loading przez `include`;
+- hooki domenowe ustawiają timestampy delivery/read i normalizują `action` do uppercase.

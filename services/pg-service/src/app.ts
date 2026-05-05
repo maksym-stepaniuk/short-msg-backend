@@ -4,6 +4,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { conversationsRouter } from "./routes/conversations";
 import { healthRouter } from "./routes/health";
 import { pgNativeRouter } from "./routes/pgNative";
+import { sequelizeAuditRouter } from "./routes/sequelizeAudit";
 import { usersRouter } from "./routes/users";
 
 export const createApp = () => {
@@ -12,6 +13,7 @@ export const createApp = () => {
   app.use(express.json());
   app.use(healthRouter);
   app.use(pgNativeRouter);
+  app.use(sequelizeAuditRouter);
   app.use(usersRouter);
   app.use(conversationsRouter);
 
