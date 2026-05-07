@@ -46,6 +46,20 @@ export const ensureMessageIndexes = async () => {
         createdAt: -1
       },
       name: "messages_created_at_idx"
+    },
+    {
+      key: {
+        conversationId: 1,
+        authorId: 1,
+        clientMessageId: 1
+      },
+      name: "messages_client_message_id_unique",
+      unique: true,
+      partialFilterExpression: {
+        clientMessageId: {
+          $exists: true
+        }
+      }
     }
   ]);
 };

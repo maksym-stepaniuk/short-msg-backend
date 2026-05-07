@@ -55,6 +55,18 @@ Publiczne grupy endpointów:
 - jeśli finalizacja PostgreSQL nie powiedzie się po zapisie MongoDB, gateway wywołuje kompensacyjne `DELETE /internal/messages/:id` i próbuje anulować rezerwację `seq`;
 - test `npm run test:e2e:hybrid-message` sprawdza sukces, blokadę 403 bez członkostwa oraz kompensację.
 
+## Reguły Domenowe
+
+- Konwersacja `direct` musi mieć dokładnie dwóch uczestników i nie pozwala na dodawanie kolejnych członków.
+- Konwersacja `group` może mieć tytuł, wymaga co najmniej jednego uczestnika, a twórca zostaje administratorem.
+- Członków do grupy może dodawać tylko admin; brak uprawnień zwraca `403`, a duplikat członkostwa `409`.
+- Wiadomość może wysłać tylko członek konwersacji; brak członkostwa zwraca `403`.
+- Treść wiadomości może być pusta tylko wtedy, gdy podano załączniki; maksymalna długość treści to 2000 znaków.
+- Początkowy status dostarczenia wiadomości to `server_received`.
+- Usunięcie użytkownika jest realizowane jako soft delete przez `deletedAt`; historia wiadomości i członkostwa pozostają w bazie, a użytkownik jest oznaczony jako usunięty.
+- Jeśli `clientMessageId` jest podany, MongoDB wymusza unikalność `{ conversationId, authorId, clientMessageId }` tylko dla dokumentów z tym polem. Duplikat zwraca `409` z kodem `IDEMPOTENCY_CONFLICT`.
+- Test `npm run test:e2e:domain-rules` sprawdza reguły członkostwa, soft delete, direct z nadmiarem uczestników, wysyłkę bez członkostwa i idempotencję.
+
 ## Format błędów
 
 Każdy serwis zwraca błędy API bez stack trace w formacie:

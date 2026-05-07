@@ -53,8 +53,14 @@ const parseCreatedAt = (value: unknown) => {
   return createdAt;
 };
 
-const parseBody = (value: unknown) => {
-  const body = requireString(value, "body");
+const parseBody = (value: unknown, attachments: AttachmentMeta[]) => {
+  const body = typeof value === "string" ? value.trim() : "";
+
+  if (body.length === 0 && attachments.length === 0) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Message body is required unless attachments are provided", {
+      field: "body"
+    });
+  }
 
   if (body.length > 2000) {
     throw new HttpError(400, "VALIDATION_ERROR", "Message body is too long", {
@@ -106,12 +112,13 @@ internalMessagesRouter.post(
       conversationId: requireString(req.body.conversationId, "conversationId"),
       authorId: requireString(req.body.authorId, "authorId"),
       seq: parseSeq(req.body.seq),
-      body: parseBody(req.body.body),
+      body: "",
       createdAt: parseCreatedAt(req.body.createdAt),
       editedAt: null,
       deliveryStatus: "server_received",
       attachments: parseAttachments(req.body.attachments)
     };
+    message.body = parseBody(req.body.body, message.attachments);
 
     const clientMessageId = typeof req.body.clientMessageId === "string" && req.body.clientMessageId.trim().length > 0
       ? req.body.clientMessageId.trim()

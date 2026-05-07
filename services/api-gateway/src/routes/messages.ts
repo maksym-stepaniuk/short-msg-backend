@@ -6,7 +6,6 @@ import {
   optionalString,
   parseLimit,
   parseOptionalInteger,
-  requireMessageBody,
   requireObjectBody,
   requireString,
   requireUuid
@@ -45,6 +44,25 @@ const parseAttachments = (value: unknown) => {
   return value;
 };
 
+const parseMessageBody = (value: unknown, attachments: unknown[]) => {
+  const body = typeof value === "string" ? value.trim() : "";
+
+  if (body.length === 0 && attachments.length === 0) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Message body is required unless attachments are provided", {
+      field: "body"
+    });
+  }
+
+  if (body.length > 2000) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Message body is too long", {
+      field: "body",
+      maxLength: 2000
+    });
+  }
+
+  return body;
+};
+
 const compensateMongoMessage = async (mongoId: string) => {
   try {
     await mongoServiceClient.request({
@@ -78,8 +96,8 @@ gatewayMessagesRouter.post(
     const body = requireObjectBody(req.body);
     const conversationId = requireUuid(requireString(req.params.conversationId, "conversationId"), "conversationId");
     const authorId = requireUuid(requireString(body.authorId, "authorId"), "authorId");
-    const messageBody = requireMessageBody(body.body);
     const attachments = parseAttachments(body.attachments);
+    const messageBody = parseMessageBody(body.body, attachments);
     const clientMessageId = optionalString(body.clientMessageId, "clientMessageId");
     const createdAt = new Date().toISOString();
 
