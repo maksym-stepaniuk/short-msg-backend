@@ -25,6 +25,24 @@ Health endpointy:
 - `GET http://localhost:3001/health`
 - `GET http://localhost:3002/health`
 
+## API Gateway
+
+`api-gateway` wystawia publiczne REST API na porcie `3000` i komunikuje się HTTP z `pg-service` oraz `mongo-service`.
+
+- `PG_SERVICE_URL` wskazuje usługę relacyjną PostgreSQL.
+- `MONGO_SERVICE_URL` wskazuje usługę dokumentową MongoDB.
+- `SERVICE_REQUEST_TIMEOUT_MS` pozwala ustawić timeout wywołań międzyserwisowych.
+- Gateway waliduje podstawowe dane wejściowe, obsługuje timeouty i zachowuje jednolity format błędów `{ error, code, details }`.
+
+Publiczne grupy endpointów:
+
+- `POST /users`, `GET /users/:id`, `DELETE /users/:id`
+- `POST /conversations`, `GET /conversations/:id`, `GET /users/:userId/conversations`
+- `POST /conversations/:conversationId/members`, `GET /conversations/:conversationId/members`
+- `POST /conversations/:conversationId/messages`, `GET /conversations/:conversationId/messages`
+- `GET /conversations/:conversationId/messages/search`
+- `GET /analytics/messages-per-day`, `GET /analytics/messages-per-conversation`
+
 ## Format błędów
 
 Każdy serwis zwraca błędy API bez stack trace w formacie:
