@@ -1,13 +1,23 @@
 openapi: 3.0.3
 info:
-  title: Chat Backend API
+  title: Chat Backend API Gateway
   version: 0.1.0
+  description: Publiczne REST API gateway dla backendu czatu tekstowego. Specyfikacja opisuje wyłącznie endpointy publiczne, bez endpointów wewnętrznych między mikroserwisami.
 servers:
   - url: http://localhost:3000
+    description: Local Docker Compose API Gateway
+tags:
+  - name: Health
+  - name: Users
+  - name: Conversations
+  - name: Messages
+  - name: Analytics
 paths:
   /health:
     get:
+      tags: [Health]
       summary: API Gateway health check
+      description: Sprawdza, czy publiczny API Gateway działa.
       responses:
         "200":
           description: Service is healthy
@@ -15,11 +25,211 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: api-gateway
         "500":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/InternalServerError"
+  /users:
+    post:
+      tags: [Users]
+      summary: Create user
+      description: Tworzy użytkownika w PostgreSQL przez pg-service. Email musi być unikalny.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+            examples:
+              createUser:
+                value:
+                  email: alice@example.test
+                  username: alice
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              examples:
+                created:
+                  value:
+                    id: 5f5226a3-0988-40ca-806e-7a86c995f597
+                    email: alice@example.test
+                    username: alice
+                    createdAt: "2026-05-07T10:00:00.000Z"
+                    deletedAt: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user
+      description: Zwraca użytkownika po identyfikatorze UUID.
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              examples:
+                found:
+                  value:
+                    id: 5f5226a3-0988-40ca-806e-7a86c995f597
+                    email: alice@example.test
+                    username: alice
+                    createdAt: "2026-05-07T10:00:00.000Z"
+                    deletedAt: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags: [Users]
+      summary: Soft delete user
+      description: Oznacza użytkownika jako usuniętego przez deletedAt. Historia wiadomości i członkostwa pozostają zachowane.
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: User soft deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              examples:
+                deleted:
+                  value:
+                    id: 5f5226a3-0988-40ca-806e-7a86c995f597
+                    email: alice@example.test
+                    username: alice
+                    createdAt: "2026-05-07T10:00:00.000Z"
+                    deletedAt: "2026-05-07T11:00:00.000Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /conversations:
+    post:
+      tags: [Conversations]
+      summary: Create conversation
+      description: Tworzy konwersację direct albo group. Direct wymaga dokładnie dwóch uczestników łącznie z twórcą. Group wymaga co najmniej jednego uczestnika, a twórca zostaje adminem.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConversationRequest"
+            examples:
+              direct:
+                value:
+                  type: direct
+                  createdById: 5f5226a3-0988-40ca-806e-7a86c995f597
+                  memberIds:
+                    - 3f2d2d59-f871-4dd0-9680-00d64fe57fb7
+              group:
+                value:
+                  type: group
+                  title: Study group
+                  createdById: 5f5226a3-0988-40ca-806e-7a86c995f597
+                  memberIds:
+                    - 3f2d2d59-f871-4dd0-9680-00d64fe57fb7
+      responses:
+        "201":
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+              examples:
+                created:
+                  value:
+                    id: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                    type: group
+                    title: Study group
+                    createdById: 5f5226a3-0988-40ca-806e-7a86c995f597
+                    lastMessageAt: null
+                    lastSeq: 0
+                    createdAt: "2026-05-07T10:00:00.000Z"
+                    members:
+                      - conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                        userId: 5f5226a3-0988-40ca-806e-7a86c995f597
+                        role: admin
+                        joinedAt: "2026-05-07T10:00:00.000Z"
+                    messagePointers: []
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /conversations/{id}:
+    get:
+      tags: [Conversations]
+      summary: Get conversation
+      description: Zwraca metadane konwersacji, członkostwa i wskaźniki wiadomości z PostgreSQL.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+      responses:
+        "200":
+          description: Conversation found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+              examples:
+                found:
+                  value:
+                    id: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                    type: direct
+                    title: null
+                    createdById: 5f5226a3-0988-40ca-806e-7a86c995f597
+                    lastMessageAt: "2026-05-07T10:30:00.000Z"
+                    lastSeq: 1
+                    createdAt: "2026-05-07T10:00:00.000Z"
+                    members: []
+                    messagePointers:
+                      - id: 6b8dca67-af4a-4c5d-a510-9017e1f22371
+                        conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                        seq: 1
+                        mongoId: 663d11223b9d5d6cc4c2f111
+                        authorId: 5f5226a3-0988-40ca-806e-7a86c995f597
+                        deliveryStatus: server_received
+                        createdAt: "2026-05-07T10:30:00.000Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /users/{userId}/conversations:
     get:
-      summary: List conversations for a user
+      tags: [Conversations]
+      summary: List user conversations
+      description: Zwraca konwersacje użytkownika posortowane po lastMessageAt DESC, potem createdAt DESC.
       parameters:
         - name: userId
           in: path
@@ -27,9 +237,10 @@ paths:
           schema:
             type: string
             format: uuid
+          example: 5f5226a3-0988-40ca-806e-7a86c995f597
       responses:
         "200":
-          description: Conversations sorted by lastMessageAt DESC, then createdAt DESC
+          description: User conversations
           content:
             application/json:
               schema:
@@ -39,50 +250,172 @@ paths:
               examples:
                 success:
                   value:
-                    - id: "0d38e5ec-33f4-4d23-90b6-210f6f64391a"
+                    - id: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
                       type: group
                       title: Study group
                       role: admin
                       joinedAt: "2026-05-07T10:00:00.000Z"
                       lastMessageAt: "2026-05-07T10:30:00.000Z"
                       lastSeq: 12
+                      createdAt: "2026-05-07T10:00:00.000Z"
         "400":
-          $ref: "#/components/responses/Error"
-  /conversations/{conversationId}/messages:
-    get:
-      summary: List conversation messages
-      description: Requires requesterId query parameter or X-User-Id header. Results are sorted chronologically by seq ASC and use MongoDB cursor filters on seq.
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /conversations/{conversationId}/members:
+    post:
+      tags: [Conversations]
+      summary: Add conversation member
+      description: Dodaje użytkownika do konwersacji group. Tylko admin grupy może dodać członka. Do direct nie można dodawać kolejnych członków.
       parameters:
-        - name: conversationId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: requesterId
-          in: query
-          required: false
-          schema:
-            type: string
-            format: uuid
-        - name: X-User-Id
-          in: header
-          required: false
-          schema:
-            type: string
-            format: uuid
+        - $ref: "#/components/parameters/ConversationIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberRequest"
+            examples:
+              addMember:
+                value:
+                  requesterId: 5f5226a3-0988-40ca-806e-7a86c995f597
+                  userId: 3f2d2d59-f871-4dd0-9680-00d64fe57fb7
+                  role: member
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationMember"
+              examples:
+                added:
+                  value:
+                    conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                    userId: 3f2d2d59-f871-4dd0-9680-00d64fe57fb7
+                    role: member
+                    joinedAt: "2026-05-07T10:05:00.000Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags: [Conversations]
+      summary: List conversation members
+      description: Zwraca członków konwersacji wraz z rolami i datami dołączenia.
+      parameters:
+        - $ref: "#/components/parameters/ConversationIdPath"
+      responses:
+        "200":
+          description: Conversation members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConversationMember"
+              examples:
+                success:
+                  value:
+                    - conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                      userId: 5f5226a3-0988-40ca-806e-7a86c995f597
+                      role: admin
+                      joinedAt: "2026-05-07T10:00:00.000Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /conversations/{conversationId}/messages:
+    post:
+      tags: [Messages]
+      summary: Send message
+      description: Zapisuje wiadomość w operacji hybrydowej PG + Mongo. Gateway sprawdza członkostwo autora, rezerwuje seq w PostgreSQL, zapisuje treść w MongoDB i finalizuje message pointer w PostgreSQL. Przy błędzie finalizacji wykonuje kompensację MongoDB.
+      parameters:
+        - $ref: "#/components/parameters/ConversationIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+            examples:
+              textMessage:
+                value:
+                  authorId: 5f5226a3-0988-40ca-806e-7a86c995f597
+                  body: Hello from gateway
+                  attachments: []
+                  clientMessageId: mobile-123
+              attachmentOnly:
+                value:
+                  authorId: 5f5226a3-0988-40ca-806e-7a86c995f597
+                  body: ""
+                  attachments:
+                    - fileName: note.txt
+                      mimeType: text/plain
+                      size: 128
+                      storageKey: attachments/note.txt
+      responses:
+        "201":
+          description: Message stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              examples:
+                created:
+                  value:
+                    _id: 663d11223b9d5d6cc4c2f111
+                    conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                    authorId: 5f5226a3-0988-40ca-806e-7a86c995f597
+                    seq: 1
+                    body: Hello from gateway
+                    createdAt: "2026-05-07T10:30:00.000Z"
+                    editedAt: null
+                    deliveryStatus: server_received
+                    attachments: []
+                    clientMessageId: mobile-123
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags: [Messages]
+      summary: List conversation messages
+      description: Wymaga requesterId w query albo nagłówka X-User-Id. Gateway sprawdza członkostwo w pg-service, a mongo-service pobiera wiadomości przez indeks conversationId + seq. Wynik jest sortowany chronologicznie po seq ASC.
+      parameters:
+        - $ref: "#/components/parameters/ConversationIdPath"
+        - $ref: "#/components/parameters/RequesterIdQuery"
+        - $ref: "#/components/parameters/XUserIdHeader"
         - name: afterSeq
           in: query
           required: false
           schema:
             type: integer
             minimum: 0
+          example: 10
         - name: beforeSeq
           in: query
           required: false
           schema:
             type: integer
             minimum: 0
+          example: 30
         - name: limit
           in: query
           required: false
@@ -91,6 +424,12 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
+        - name: mimeType
+          in: query
+          required: false
+          schema:
+            type: string
+          example: image/png,text/plain
       responses:
         "200":
           description: Messages sorted by seq ASC
@@ -103,50 +442,39 @@ paths:
               examples:
                 success:
                   value:
-                    - _id: "663d11223b9d5d6cc4c2f111"
-                      conversationId: "0d38e5ec-33f4-4d23-90b6-210f6f64391a"
-                      authorId: "5f5226a3-0988-40ca-806e-7a86c995f597"
+                    - _id: 663d11223b9d5d6cc4c2f111
+                      conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                      authorId: 5f5226a3-0988-40ca-806e-7a86c995f597
                       seq: 12
-                      body: "Hello"
+                      body: Hello
                       createdAt: "2026-05-07T10:30:00.000Z"
                       editedAt: null
                       deliveryStatus: server_received
                       attachments: []
         "400":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/BadRequest"
         "403":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/Forbidden"
         "404":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /conversations/{conversationId}/messages/search:
     get:
+      tags: [Messages]
       summary: Search conversation messages
-      description: Requires requesterId query parameter or X-User-Id header. Uses MongoDB text index on message body and filters by conversationId.
+      description: Wymaga requesterId w query albo nagłówka X-User-Id. Gateway sprawdza członkostwo, a mongo-service używa indeksu tekstowego na body i filtruje po conversationId. Limit maksymalny to 50.
       parameters:
-        - name: conversationId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: requesterId
-          in: query
-          required: false
-          schema:
-            type: string
-            format: uuid
-        - name: X-User-Id
-          in: header
-          required: false
-          schema:
-            type: string
-            format: uuid
+        - $ref: "#/components/parameters/ConversationIdPath"
+        - $ref: "#/components/parameters/RequesterIdQuery"
+        - $ref: "#/components/parameters/XUserIdHeader"
         - name: q
           in: query
           required: true
           schema:
             type: string
             minLength: 1
+          example: hello
         - name: limit
           in: query
           required: false
@@ -167,29 +495,140 @@ paths:
               examples:
                 success:
                   value:
-                    - _id: "663d11223b9d5d6cc4c2f111"
-                      conversationId: "0d38e5ec-33f4-4d23-90b6-210f6f64391a"
-                      authorId: "5f5226a3-0988-40ca-806e-7a86c995f597"
+                    - _id: 663d11223b9d5d6cc4c2f111
+                      conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                      authorId: 5f5226a3-0988-40ca-806e-7a86c995f597
                       seq: 12
-                      body: "Hello from search"
+                      body: Hello from search
                       createdAt: "2026-05-07T10:30:00.000Z"
                       editedAt: null
                       deliveryStatus: server_received
                       attachments: []
                       score: 1.2
         "400":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/BadRequest"
         "403":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/Forbidden"
         "404":
-          $ref: "#/components/responses/Error"
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /analytics/messages-per-day:
+    get:
+      tags: [Analytics]
+      summary: Count messages per day
+      description: Zwraca agregację MongoDB Pipeline dla liczby wiadomości dziennie w jednej konwersacji. Pipeline wykonuje agregację w bazie.
+      parameters:
+        - name: conversationId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+      responses:
+        "200":
+          description: Daily message counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalyticsMessagesPerDayResponse"
+              examples:
+                success:
+                  value:
+                    - day: "2026-05-07"
+                      count: 15
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /analytics/messages-per-conversation:
+    get:
+      tags: [Analytics]
+      summary: Count messages per conversation
+      description: Zwraca agregację MongoDB Pipeline dla liczby wiadomości per konwersacja wraz z dodatkowymi danymi z lookup.
+      parameters:
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+      responses:
+        "200":
+          description: Message counts per conversation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalyticsMessagesPerConversationResponse"
+              examples:
+                success:
+                  value:
+                    - conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+                      count: 42
+                      lastActivityType: MESSAGE_SENT
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 components:
+  parameters:
+    UserIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 5f5226a3-0988-40ca-806e-7a86c995f597
+    ConversationIdPath:
+      name: conversationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
+    RequesterIdQuery:
+      name: requesterId
+      in: query
+      required: false
+      description: UUID użytkownika wykonującego odczyt. Alternatywnie można podać X-User-Id.
+      schema:
+        type: string
+        format: uuid
+      example: 5f5226a3-0988-40ca-806e-7a86c995f597
+    XUserIdHeader:
+      name: X-User-Id
+      in: header
+      required: false
+      description: UUID użytkownika wykonującego odczyt, alternatywa dla requesterId.
+      schema:
+        type: string
+        format: uuid
+      example: 5f5226a3-0988-40ca-806e-7a86c995f597
+    FromQuery:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      example: "2026-05-01T00:00:00.000Z"
+    ToQuery:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      example: "2026-05-08T00:00:00.000Z"
   schemas:
     HealthResponse:
       type: object
-      required:
-        - status
-        - service
+      required: [status, service]
       properties:
         status:
           type: string
@@ -197,31 +636,75 @@ components:
         service:
           type: string
           example: api-gateway
-    UserConversation:
+    User:
       type: object
-      required:
-        - id
-        - type
-        - role
-        - joinedAt
-        - lastSeq
+      required: [id, email, username, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+    Conversation:
+      type: object
+      required: [id, type, createdById, lastSeq, createdAt]
       properties:
         id:
           type: string
           format: uuid
         type:
           type: string
-          enum:
-            - direct
-            - group
+          enum: [direct, group]
+        title:
+          type: string
+          nullable: true
+        createdById:
+          type: string
+          format: uuid
+        lastMessageAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSeq:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationMember"
+        messagePointers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessagePointer"
+    UserConversation:
+      type: object
+      required: [id, type, role, joinedAt, lastSeq, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [direct, group]
         title:
           type: string
           nullable: true
         role:
           type: string
-          enum:
-            - admin
-            - member
+          enum: [admin, member]
         joinedAt:
           type: string
           format: date-time
@@ -231,20 +714,32 @@ components:
           nullable: true
         lastSeq:
           type: integer
+        createdAt:
+          type: string
+          format: date-time
+    ConversationMember:
+      type: object
+      required: [conversationId, userId, role, joinedAt]
+      properties:
+        conversationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [admin, member]
+        joinedAt:
+          type: string
+          format: date-time
     Message:
       type: object
-      required:
-        - _id
-        - conversationId
-        - authorId
-        - seq
-        - body
-        - createdAt
-        - deliveryStatus
-        - attachments
+      required: [_id, conversationId, authorId, seq, body, createdAt, editedAt, deliveryStatus, attachments]
       properties:
         _id:
           type: string
+          example: 663d11223b9d5d6cc4c2f111
         conversationId:
           type: string
           format: uuid
@@ -253,8 +748,10 @@ components:
           format: uuid
         seq:
           type: integer
+          minimum: 1
         body:
           type: string
+          maxLength: 2000
         createdAt:
           type: string
           format: date-time
@@ -264,33 +761,215 @@ components:
           nullable: true
         deliveryStatus:
           type: string
-          enum:
-            - server_received
-            - delivered
-            - read
+          enum: [server_received, delivered, read]
         attachments:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/Attachment"
         clientMessageId:
           type: string
+        score:
+          type: number
+          description: Obecne tylko w wynikach wyszukiwania tekstowego.
+    Attachment:
+      type: object
+      required: [fileName, mimeType, size, storageKey]
+      properties:
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        storageKey:
+          type: string
+    MessagePointer:
+      type: object
+      required: [id, conversationId, seq, mongoId, authorId, deliveryStatus, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversationId:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          minimum: 1
+        mongoId:
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        deliveryStatus:
+          type: string
+          enum: [server_received, delivered, read]
+        createdAt:
+          type: string
+          format: date-time
+    CreateUserRequest:
+      type: object
+      required: [email, username]
+      properties:
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+          minLength: 1
+    CreateConversationRequest:
+      type: object
+      required: [type, createdById, memberIds]
+      properties:
+        type:
+          type: string
+          enum: [direct, group]
+        title:
+          type: string
+          nullable: true
+        createdById:
+          type: string
+          format: uuid
+        memberIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+    AddMemberRequest:
+      type: object
+      required: [requesterId, userId]
+      properties:
+        requesterId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [admin, member]
+          default: member
+    SendMessageRequest:
+      type: object
+      required: [authorId, body]
+      properties:
+        authorId:
+          type: string
+          format: uuid
+        body:
+          type: string
+          maxLength: 2000
+          description: Może być puste tylko wtedy, gdy attachments nie jest puste.
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+          default: []
+        clientMessageId:
+          type: string
+          description: Opcjonalny klucz idempotencji w krótkim oknie.
+    AnalyticsMessagesPerDayResponse:
+      type: object
+      required: [day, count]
+      properties:
+        day:
+          type: string
+          example: "2026-05-07"
+        count:
+          type: integer
+          minimum: 0
+    AnalyticsMessagesPerConversationResponse:
+      type: object
+      required: [conversationId, count]
+      properties:
+        conversationId:
+          type: string
+          format: uuid
+        count:
+          type: integer
+          minimum: 0
+        lastActivityType:
+          type: string
+          nullable: true
+          example: MESSAGE_SENT
     ErrorResponse:
       type: object
-      required:
-        - error
-        - code
-        - details
+      required: [error, code, details]
       properties:
         error:
           type: string
+          example: User is not a conversation member
         code:
           type: string
+          example: CONVERSATION_MEMBERSHIP_REQUIRED
         details:
+          type: object
           nullable: true
+          additionalProperties: true
+          example:
+            conversationId: 0d38e5ec-33f4-4d23-90b6-210f6f64391a
   responses:
-    Error:
-      description: API error
+    BadRequest:
+      description: Validation or malformed request error
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            validation:
+              value:
+                error: Field is required
+                code: VALIDATION_ERROR
+                details:
+                  field: requesterId
+    Forbidden:
+      description: Permission denied
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            forbidden:
+              value:
+                error: User is not a conversation member
+                code: CONVERSATION_MEMBERSHIP_REQUIRED
+                details: null
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            notFound:
+              value:
+                error: Resource not found
+                code: RESOURCE_NOT_FOUND
+                details: null
+    Conflict:
+      description: Conflict, duplicate resource or idempotency conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            conflict:
+              value:
+                error: Unique constraint violation
+                code: UNIQUE_CONSTRAINT_VIOLATION
+                details:
+                  target:
+                    - email
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            internal:
+              value:
+                error: Internal server error
+                code: INTERNAL_SERVER_ERROR
+                details: null
