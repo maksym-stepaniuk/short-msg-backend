@@ -18,9 +18,9 @@ enum MemberRole {
 }
 
 enum DeliveryStatus {
-  accepted
+  server_received
   delivered
-  failed
+  read
 }
 
 model User {
@@ -69,7 +69,7 @@ model MessagePointer {
   seq            Int
   mongoId        String         @unique
   authorId       String         @db.Uuid
-  deliveryStatus DeliveryStatus @default(accepted)
+  deliveryStatus DeliveryStatus @default(server_received)
   createdAt      DateTime       @default(now())
   conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   author         User           @relation("MessageAuthor", fields: [authorId], references: [id])

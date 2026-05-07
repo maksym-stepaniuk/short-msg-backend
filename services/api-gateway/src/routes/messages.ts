@@ -8,35 +8,133 @@ import {
   parseOptionalInteger,
   requireMessageBody,
   requireObjectBody,
-  requireString
+  requireString,
+  requireUuid
 } from "./validators";
+import { pgServiceClient } from "../clients/pgServiceClient";
 
 export const gatewayMessagesRouter = Router();
+
+type SeqReservation = {
+  conversationId: string;
+  nextSeq: number;
+};
+
+type MongoMessage = {
+  _id: string;
+  conversationId: string;
+  authorId: string;
+  seq: number;
+  body: string;
+  createdAt: string;
+  attachments: unknown[];
+  clientMessageId?: string;
+};
+
+const parseAttachments = (value: unknown) => {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new HttpError(400, "VALIDATION_ERROR", "attachments must be an array", {
+      field: "attachments"
+    });
+  }
+
+  return value;
+};
+
+const compensateMongoMessage = async (mongoId: string) => {
+  try {
+    await mongoServiceClient.request({
+      method: "DELETE",
+      path: `/internal/messages/${mongoId}`
+    });
+    console.log(`Compensation succeeded: removed Mongo message ${mongoId}`);
+  } catch (err) {
+    console.error(`Compensation failed: could not remove Mongo message ${mongoId}`, err);
+  }
+};
+
+const cancelReservation = async (conversationId: string, seq: number) => {
+  try {
+    await pgServiceClient.request({
+      method: "POST",
+      path: "/internal/messages/cancel-reservation",
+      body: {
+        conversationId,
+        seq
+      }
+    });
+  } catch (err) {
+    console.error(`Reservation cancellation failed for conversation ${conversationId} seq ${seq}`, err);
+  }
+};
 
 gatewayMessagesRouter.post(
   "/conversations/:conversationId/messages",
   asyncHandler(async (req, res) => {
     const body = requireObjectBody(req.body);
-    const conversationId = requireString(req.params.conversationId, "conversationId");
-    const authorId = requireString(body.authorId, "authorId");
+    const conversationId = requireUuid(requireString(req.params.conversationId, "conversationId"), "conversationId");
+    const authorId = requireUuid(requireString(body.authorId, "authorId"), "authorId");
     const messageBody = requireMessageBody(body.body);
+    const attachments = parseAttachments(body.attachments);
+    const clientMessageId = optionalString(body.clientMessageId, "clientMessageId");
+    const createdAt = new Date().toISOString();
 
-    if (typeof body.seq !== "number" || !Number.isInteger(body.seq)) {
-      throw new HttpError(400, "VALIDATION_ERROR", "Message seq must be an integer", {
-        field: "seq"
-      });
-    }
-
-    const message = await mongoServiceClient.request({
+    await pgServiceClient.request({
       method: "POST",
-      path: "/messages",
+      path: `/internal/conversations/${conversationId}/validate-membership`,
       body: {
-        ...body,
-        conversationId,
-        authorId,
-        body: messageBody
+        authorId
       }
     });
+
+    const reservation = await pgServiceClient.request<SeqReservation>({
+      method: "POST",
+      path: `/internal/conversations/${conversationId}/reserve-seq`
+    });
+
+    let message: MongoMessage | null = null;
+
+    try {
+      message = await mongoServiceClient.request<MongoMessage>({
+        method: "POST",
+        path: "/internal/messages",
+        body: {
+          conversationId,
+          authorId,
+          seq: reservation.nextSeq,
+          body: messageBody,
+          attachments,
+          clientMessageId,
+          createdAt
+        }
+      });
+    } catch (err) {
+      await cancelReservation(conversationId, reservation.nextSeq);
+      throw err;
+    }
+
+    try {
+      await pgServiceClient.request({
+        method: "POST",
+        path: "/internal/messages/finalize",
+        body: {
+          conversationId,
+          seq: reservation.nextSeq,
+          mongoId: message._id,
+          authorId,
+          createdAt: message.createdAt,
+          simulateFailure: req.header("x-simulate-pg-finalize-failure") === "true"
+        }
+      });
+    } catch (err) {
+      await compensateMongoMessage(message._id);
+      await cancelReservation(conversationId, reservation.nextSeq);
+      throw err;
+    }
 
     res.status(201).json(message);
   })

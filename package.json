@@ -9,6 +9,7 @@
     "build": "npm run build --workspaces",
     "dev:gateway": "npm run dev --workspace @chat/api-gateway",
     "dev:pg": "npm run dev --workspace @chat/pg-service",
-    "dev:mongo": "npm run dev --workspace @chat/mongo-service"
+    "dev:mongo": "npm run dev --workspace @chat/mongo-service",
+    "test:e2e:hybrid-message": "node tests/e2e/hybrid-message.e2e.js"
   }
 }

@@ -3,6 +3,7 @@ import { HttpError } from "./errors/httpError";
 import { errorHandler } from "./middleware/errorHandler";
 import { conversationsRouter } from "./routes/conversations";
 import { healthRouter } from "./routes/health";
+import { internalMessagesRouter } from "./routes/internalMessages";
 import { pgNativeRouter } from "./routes/pgNative";
 import { sequelizeAuditRouter } from "./routes/sequelizeAudit";
 import { usersRouter } from "./routes/users";
@@ -12,6 +13,7 @@ export const createApp = () => {
 
   app.use(express.json());
   app.use(healthRouter);
+  app.use(internalMessagesRouter);
   app.use(pgNativeRouter);
   app.use(sequelizeAuditRouter);
   app.use(usersRouter);

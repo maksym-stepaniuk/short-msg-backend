@@ -43,6 +43,18 @@ Publiczne grupy endpointów:
 - `GET /conversations/:conversationId/messages/search`
 - `GET /analytics/messages-per-day`, `GET /analytics/messages-per-conversation`
 
+## T8c Operacja Hybrydowa
+
+`POST /conversations/:conversationId/messages` jest orkiestracją w `api-gateway`:
+
+- gateway waliduje `authorId`, `body`, długość treści i załączniki;
+- `pg-service` sprawdza istnienie konwersacji oraz członkostwo autora;
+- `pg-service` rezerwuje kolejny `seq` w transakcji PostgreSQL z `SELECT ... FOR UPDATE`;
+- `mongo-service` zapisuje dokument wiadomości w kolekcji `messages`;
+- `pg-service` finalizuje zapis przez `message_pointers` i aktualizację `lastMessageAt`;
+- jeśli finalizacja PostgreSQL nie powiedzie się po zapisie MongoDB, gateway wywołuje kompensacyjne `DELETE /internal/messages/:id` i próbuje anulować rezerwację `seq`;
+- test `npm run test:e2e:hybrid-message` sprawdza sukces, blokadę 403 bez członkostwa oraz kompensację.
+
 ## Format błędów
 
 Każdy serwis zwraca błędy API bez stack trace w formacie:
