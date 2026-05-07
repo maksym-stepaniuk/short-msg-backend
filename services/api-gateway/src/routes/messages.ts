@@ -63,6 +63,46 @@ const parseMessageBody = (value: unknown, attachments: unknown[]) => {
   return body;
 };
 
+const parseRequesterId = (queryValue: unknown, headerValue: string | undefined) => {
+  const requesterId = optionalString(queryValue, "requesterId") ?? headerValue;
+
+  return requireUuid(requireString(requesterId, "requesterId"), "requesterId");
+};
+
+const parseSearchLimit = (value: unknown) => {
+  const limit = parseLimit(value, 20);
+
+  if (limit > 50) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Limit must be between 1 and 50", {
+      field: "limit"
+    });
+  }
+
+  return limit;
+};
+
+const parseOptionalSeqCursor = (value: unknown, field: string) => {
+  const cursor = parseOptionalInteger(value, field);
+
+  if (cursor !== undefined && cursor < 0) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Cursor must be a non-negative integer", {
+      field
+    });
+  }
+
+  return cursor;
+};
+
+const validateMembership = async (conversationId: string, requesterId: string) => {
+  await pgServiceClient.request({
+    method: "POST",
+    path: `/internal/conversations/${conversationId}/validate-membership`,
+    body: {
+      authorId: requesterId
+    }
+  });
+};
+
 const compensateMongoMessage = async (mongoId: string) => {
   try {
     await mongoServiceClient.request({
@@ -101,13 +141,7 @@ gatewayMessagesRouter.post(
     const clientMessageId = optionalString(body.clientMessageId, "clientMessageId");
     const createdAt = new Date().toISOString();
 
-    await pgServiceClient.request({
-      method: "POST",
-      path: `/internal/conversations/${conversationId}/validate-membership`,
-      body: {
-        authorId
-      }
-    });
+    await validateMembership(conversationId, authorId);
 
     const reservation = await pgServiceClient.request<SeqReservation>({
       method: "POST",
@@ -161,9 +195,12 @@ gatewayMessagesRouter.post(
 gatewayMessagesRouter.get(
   "/conversations/:conversationId/messages/search",
   asyncHandler(async (req, res) => {
-    const conversationId = requireString(req.params.conversationId, "conversationId");
+    const conversationId = requireUuid(requireString(req.params.conversationId, "conversationId"), "conversationId");
+    const requesterId = parseRequesterId(req.query.requesterId, req.header("x-user-id"));
     const q = requireString(req.query.q, "q");
-    const limit = parseLimit(req.query.limit);
+    const limit = parseSearchLimit(req.query.limit);
+
+    await validateMembership(conversationId, requesterId);
 
     const messages = await mongoServiceClient.request({
       path: "/messages/search",
@@ -181,11 +218,14 @@ gatewayMessagesRouter.get(
 gatewayMessagesRouter.get(
   "/conversations/:conversationId/messages",
   asyncHandler(async (req, res) => {
-    const conversationId = requireString(req.params.conversationId, "conversationId");
-    const afterSeq = parseOptionalInteger(req.query.afterSeq, "afterSeq");
-    const beforeSeq = parseOptionalInteger(req.query.beforeSeq, "beforeSeq");
-    const limit = parseLimit(req.query.limit);
+    const conversationId = requireUuid(requireString(req.params.conversationId, "conversationId"), "conversationId");
+    const requesterId = parseRequesterId(req.query.requesterId, req.header("x-user-id"));
+    const afterSeq = parseOptionalSeqCursor(req.query.afterSeq, "afterSeq");
+    const beforeSeq = parseOptionalSeqCursor(req.query.beforeSeq, "beforeSeq");
+    const limit = parseLimit(req.query.limit, 20);
     const mimeType = optionalString(req.query.mimeType, "mimeType");
+
+    await validateMembership(conversationId, requesterId);
 
     const messages = await mongoServiceClient.request({
       path: `/conversations/${encodeURIComponent(conversationId)}/messages`,

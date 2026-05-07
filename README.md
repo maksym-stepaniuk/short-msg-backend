@@ -43,6 +43,9 @@ Publiczne grupy endpointów:
 - `GET /conversations/:conversationId/messages/search`
 - `GET /analytics/messages-per-day`, `GET /analytics/messages-per-conversation`
 
+Endpoint `GET /conversations/:conversationId/messages` wymaga `requesterId` w query albo nagłówka `X-User-Id`, sprawdza członkostwo w `pg-service`, używa cursorów `afterSeq`/`beforeSeq` na MongoDB przez `$gt`/`$lt` i zwraca wiadomości chronologicznie po `seq ASC` z domyślnym `limit=20` oraz maksimum `100`.
+Endpoint `GET /conversations/:conversationId/messages/search` również wymaga członkostwa i korzysta z indeksu tekstowego MongoDB na `body`; `limit` ma maksimum `50`.
+
 ## T8c Operacja Hybrydowa
 
 `POST /conversations/:conversationId/messages` jest orkiestracją w `api-gateway`:

@@ -84,7 +84,10 @@ const main = async () => {
   assert.equal(compensationResponse.status, 500);
   assert.equal(compensationResponse.payload.code, "SIMULATED_PG_FINALIZE_FAILURE");
 
-  const messagesAfterCompensation = await request("GET", `/conversations/${conversationId}/messages?afterSeq=0&limit=20`);
+  const messagesAfterCompensation = await request(
+    "GET",
+    `/conversations/${conversationId}/messages?requesterId=${author.id}&afterSeq=0&limit=20`
+  );
   assert.equal(messagesAfterCompensation.status, 200);
   assert.equal(
     messagesAfterCompensation.payload.some((message) => message.body === "message that must be compensated"),

@@ -17,6 +17,172 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
         "500":
           $ref: "#/components/responses/Error"
+  /users/{userId}/conversations:
+    get:
+      summary: List conversations for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Conversations sorted by lastMessageAt DESC, then createdAt DESC
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserConversation"
+              examples:
+                success:
+                  value:
+                    - id: "0d38e5ec-33f4-4d23-90b6-210f6f64391a"
+                      type: group
+                      title: Study group
+                      role: admin
+                      joinedAt: "2026-05-07T10:00:00.000Z"
+                      lastMessageAt: "2026-05-07T10:30:00.000Z"
+                      lastSeq: 12
+        "400":
+          $ref: "#/components/responses/Error"
+  /conversations/{conversationId}/messages:
+    get:
+      summary: List conversation messages
+      description: Requires requesterId query parameter or X-User-Id header. Results are sorted chronologically by seq ASC and use MongoDB cursor filters on seq.
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: requesterId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: X-User-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: afterSeq
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - name: beforeSeq
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Messages sorted by seq ASC
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+              examples:
+                success:
+                  value:
+                    - _id: "663d11223b9d5d6cc4c2f111"
+                      conversationId: "0d38e5ec-33f4-4d23-90b6-210f6f64391a"
+                      authorId: "5f5226a3-0988-40ca-806e-7a86c995f597"
+                      seq: 12
+                      body: "Hello"
+                      createdAt: "2026-05-07T10:30:00.000Z"
+                      editedAt: null
+                      deliveryStatus: server_received
+                      attachments: []
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /conversations/{conversationId}/messages/search:
+    get:
+      summary: Search conversation messages
+      description: Requires requesterId query parameter or X-User-Id header. Uses MongoDB text index on message body and filters by conversationId.
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: requesterId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: X-User-Id
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Search results ordered by MongoDB text score
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+              examples:
+                success:
+                  value:
+                    - _id: "663d11223b9d5d6cc4c2f111"
+                      conversationId: "0d38e5ec-33f4-4d23-90b6-210f6f64391a"
+                      authorId: "5f5226a3-0988-40ca-806e-7a86c995f597"
+                      seq: 12
+                      body: "Hello from search"
+                      createdAt: "2026-05-07T10:30:00.000Z"
+                      editedAt: null
+                      deliveryStatus: server_received
+                      attachments: []
+                      score: 1.2
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 components:
   schemas:
     HealthResponse:
@@ -31,6 +197,83 @@ components:
         service:
           type: string
           example: api-gateway
+    UserConversation:
+      type: object
+      required:
+        - id
+        - type
+        - role
+        - joinedAt
+        - lastSeq
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - direct
+            - group
+        title:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum:
+            - admin
+            - member
+        joinedAt:
+          type: string
+          format: date-time
+        lastMessageAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSeq:
+          type: integer
+    Message:
+      type: object
+      required:
+        - _id
+        - conversationId
+        - authorId
+        - seq
+        - body
+        - createdAt
+        - deliveryStatus
+        - attachments
+      properties:
+        _id:
+          type: string
+        conversationId:
+          type: string
+          format: uuid
+        authorId:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        editedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deliveryStatus:
+          type: string
+          enum:
+            - server_received
+            - delivered
+            - read
+        attachments:
+          type: array
+          items:
+            type: object
+        clientMessageId:
+          type: string
     ErrorResponse:
       type: object
       required:

@@ -11,6 +11,7 @@
     "dev:pg": "npm run dev --workspace @chat/pg-service",
     "dev:mongo": "npm run dev --workspace @chat/mongo-service",
     "test:e2e:hybrid-message": "node tests/e2e/hybrid-message.e2e.js",
-    "test:e2e:domain-rules": "node tests/e2e/domain-rules.e2e.js"
+    "test:e2e:domain-rules": "node tests/e2e/domain-rules.e2e.js",
+    "test:e2e:read-endpoints": "node tests/e2e/read-endpoints.e2e.js"
   }
 }

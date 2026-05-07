@@ -57,11 +57,31 @@ const parseOptionalIntegerQuery = (value: unknown, field: string) => {
   return parsed;
 };
 
+const parseOptionalSeqCursor = (value: unknown, field: string) => {
+  const cursor = parseOptionalIntegerQuery(value, field);
+
+  if (cursor !== undefined && cursor < 0) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Cursor must be a non-negative integer", { field });
+  }
+
+  return cursor;
+};
+
 const parseLimit = (value: unknown) => {
-  const limit = parseOptionalIntegerQuery(value, "limit") ?? 50;
+  const limit = parseOptionalIntegerQuery(value, "limit") ?? 20;
 
   if (limit < 1 || limit > 100) {
     throw new HttpError(400, "VALIDATION_ERROR", "Limit must be between 1 and 100", { field: "limit" });
+  }
+
+  return limit;
+};
+
+const parseSearchLimit = (value: unknown) => {
+  const limit = parseOptionalIntegerQuery(value, "limit") ?? 20;
+
+  if (limit < 1 || limit > 50) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Limit must be between 1 and 50", { field: "limit" });
   }
 
   return limit;
@@ -177,7 +197,7 @@ messagesRouter.get(
   asyncHandler(async (req, res) => {
     const q = requireString(req.query.q, "q");
     const conversationId = optionalString(req.query.conversationId, "conversationId");
-    const limit = parseLimit(req.query.limit);
+    const limit = parseSearchLimit(req.query.limit);
 
     const filter: Record<string, unknown> = {
       $text: {
@@ -228,8 +248,8 @@ messagesRouter.get(
 messagesRouter.get(
   "/conversations/:conversationId/messages",
   asyncHandler(async (req, res) => {
-    const afterSeq = parseOptionalIntegerQuery(req.query.afterSeq, "afterSeq");
-    const beforeSeq = parseOptionalIntegerQuery(req.query.beforeSeq, "beforeSeq");
+    const afterSeq = parseOptionalSeqCursor(req.query.afterSeq, "afterSeq");
+    const beforeSeq = parseOptionalSeqCursor(req.query.beforeSeq, "beforeSeq");
     const limit = parseLimit(req.query.limit);
     const mimeTypes = parseMimeTypes(req.query.mimeType);
 
