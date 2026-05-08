@@ -25,6 +25,24 @@ Health endpointy:
 - `GET http://localhost:3001/health`
 - `GET http://localhost:3002/health`
 
+## Testy
+
+Testy e2e/integracyjne używają `Jest` i `Supertest`, uderzają w publiczny `api-gateway` oraz zakładają działające bazy z Docker Compose.
+
+```bash
+docker compose up --build
+npm run test:e2e
+```
+
+`npm run test` uruchamia ten sam zestaw krytycznych testów. Przed czystym przebiegiem można wyczyścić bazy przez:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+Zakres testów obejmuje healthcheck, użytkowników i duplikat email, reguły grup i członkostwa, wysyłkę wiadomości, zapis dokumentu MongoDB i pointera PostgreSQL, odczyt z cursorami, kompensację operacji hybrydowej oraz endpoint analityczny `messages-per-day`.
+
 ## API Gateway
 
 `api-gateway` wystawia publiczne REST API na porcie `3000` i komunikuje się HTTP z `pg-service` oraz `mongo-service`.

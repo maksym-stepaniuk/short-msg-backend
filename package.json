@@ -12,6 +12,12 @@
     "dev:mongo": "npm run dev --workspace @chat/mongo-service",
     "test:e2e:hybrid-message": "node tests/e2e/hybrid-message.e2e.js",
     "test:e2e:domain-rules": "node tests/e2e/domain-rules.e2e.js",
-    "test:e2e:read-endpoints": "node tests/e2e/read-endpoints.e2e.js"
+    "test:e2e:read-endpoints": "node tests/e2e/read-endpoints.e2e.js",
+    "test": "jest --runInBand",
+    "test:e2e": "jest --runInBand tests/e2e/critical-paths.e2e.test.js"
+  },
+  "devDependencies": {
+    "jest": "^30.4.1",
+    "supertest": "^7.2.2"
   }
 }
