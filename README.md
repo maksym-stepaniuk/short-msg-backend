@@ -1,14 +1,56 @@
-# Chat Backend
+# Wymiana krótkich wiadomości — backend i przechowywanie
 
-Backend serwisu wymiany krótkich wiadomości. Projekt jest przygotowany jako zestaw mikroserwisów Node.js/TypeScript uruchamianych przez Docker Compose.
+Backend czatu tekstowego z REST API, PostgreSQL dla trwałych metadanych oraz MongoDB dla pełnej treści wiadomości, metadanych załączników i agregacji.
 
-## Serwisy
+Projekt jest zbudowany jako zestaw mikroserwisów Node.js/TypeScript uruchamianych przez Docker Compose.
 
-- `api-gateway` - publiczne REST API i komunikacja HTTP z serwisami domenowymi.
-- `pg-service` - przyszła obsługa PostgreSQL, Prisma, Knex, `pg` oraz Sequelize.
-- `mongo-service` - przyszła obsługa MongoDB native driver, Mongoose, wiadomości, zdarzeń aktywności i analityki.
-- `postgres` - relacyjna baza metadanych.
-- `mongo` - dokumentowa baza treści wiadomości i zdarzeń.
+## Technologie
+
+- Node.js
+- TypeScript
+- Express
+- PostgreSQL
+- Prisma
+- Knex.js
+- `pg`
+- Sequelize v6
+- MongoDB native driver
+- Mongoose
+- Docker Compose
+- OpenAPI
+- Jest + Supertest
+
+## Architektura
+
+- `api-gateway` — publiczne REST API, walidacja wejścia, orkiestracja operacji hybrydowej i komunikacja HTTP z serwisami domenowymi.
+- `pg-service` — PostgreSQL, Prisma, Knex.js, natywny sterownik `pg` oraz Sequelize v6.
+- `mongo-service` — MongoDB native driver, Mongoose, kolekcja `messages`, activity events, drafts i analytics.
+- `postgres` — relacyjna baza metadanych: użytkownicy, konwersacje, członkostwa, wskaźniki wiadomości.
+- `mongo` — dokumentowa baza treści wiadomości, załączników i danych analitycznych.
+
+Podział odpowiedzialności:
+
+- PostgreSQL przechowuje trwałe metadane i kolejność wiadomości: `users`, `conversations`, `conversation_members`, `message_pointers`.
+- MongoDB przechowuje treść wiadomości, metadane załączników, indeksy tekstowe i dane do agregacji.
+- API Gateway nie zapisuje bezpośrednio do baz — komunikuje się z `pg-service` i `mongo-service` przez HTTP.
+
+## Diagram przepływu
+
+```text
+Client -> API Gateway -> pg-service    -> PostgreSQL
+Client -> API Gateway -> mongo-service -> MongoDB
+```
+
+Zapis wiadomości:
+
+```text
+Client
+ -> API Gateway
+ -> pg-service: validate membership + reserve seq
+ -> mongo-service: insert message
+ -> pg-service: create message_pointer + update lastMessageAt/lastSeq
+ -> if PG fail: mongo-service delete message
+```
 
 ## Uruchomienie
 
@@ -17,174 +59,252 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Komenda uruchamia kontenery `api-gateway`, `pg-service`, `mongo-service`, `postgres` oraz `mongo` bez dodatkowych kroków ręcznych.
+Komenda uruchamia kontenery `api-gateway`, `pg-service`, `mongo-service`, `postgres` i `mongo` bez kroków ręcznych.
 
 Health endpointy:
 
-- `GET http://localhost:3000/health`
-- `GET http://localhost:3001/health`
-- `GET http://localhost:3002/health`
+- `GET http://localhost:3000/health` — API Gateway
+- `GET http://localhost:3001/health` — pg-service
+- `GET http://localhost:3002/health` — mongo-service
 
-## Testy
-
-Testy e2e/integracyjne używają `Jest` i `Supertest`, uderzają w publiczny `api-gateway` oraz zakładają działające bazy z Docker Compose.
-
-```bash
-docker compose up --build
-npm run test:e2e
-```
-
-`npm run test` uruchamia ten sam zestaw krytycznych testów. Przed czystym przebiegiem można wyczyścić bazy przez:
+Czyszczenie danych lokalnych:
 
 ```bash
 docker compose down -v
-docker compose up --build
 ```
 
-Zakres testów obejmuje healthcheck, użytkowników i duplikat email, reguły grup i członkostwa, wysyłkę wiadomości, zapis dokumentu MongoDB i pointera PostgreSQL, odczyt z cursorami, kompensację operacji hybrydowej oraz endpoint analityczny `messages-per-day`.
+## Zmienne środowiskowe
 
-## API Gateway
+Zmienne są opisane w `.env.example`.
 
-`api-gateway` wystawia publiczne REST API na porcie `3000` i komunikuje się HTTP z `pg-service` oraz `mongo-service`.
+| Zmienna | Opis |
+| --- | --- |
+| `NODE_ENV` | Tryb uruchomienia aplikacji. |
+| `API_GATEWAY_PORT` | Lokalny port `api-gateway`, domyślnie `3000`. |
+| `PG_SERVICE_PORT` | Lokalny port `pg-service`, domyślnie `3001`. |
+| `MONGO_SERVICE_PORT` | Lokalny port `mongo-service`, domyślnie `3002`. |
+| `PG_SERVICE_URL` | Adres HTTP `pg-service` używany przez gateway. |
+| `MONGO_SERVICE_URL` | Adres HTTP `mongo-service` używany przez gateway. |
+| `SERVICE_REQUEST_TIMEOUT_MS` | Timeout wywołań międzyserwisowych gateway. |
+| `POSTGRES_DB` | Nazwa bazy PostgreSQL. |
+| `POSTGRES_USER` | Użytkownik PostgreSQL. |
+| `POSTGRES_PASSWORD` | Hasło PostgreSQL. |
+| `POSTGRES_HOST` | Host PostgreSQL w sieci Docker. |
+| `POSTGRES_PORT` | Port PostgreSQL. |
+| `DATABASE_URL` | Connection string PostgreSQL używany przez Prisma, Knex, `pg` i Sequelize. |
+| `MONGO_INITDB_ROOT_USERNAME` | Użytkownik root MongoDB. |
+| `MONGO_INITDB_ROOT_PASSWORD` | Hasło root MongoDB. |
+| `MONGO_INITDB_DATABASE` | Nazwa bazy MongoDB. |
+| `MONGO_URI` | Connection string MongoDB używany przez `mongo-service`. |
 
-- `PG_SERVICE_URL` wskazuje usługę relacyjną PostgreSQL.
-- `MONGO_SERVICE_URL` wskazuje usługę dokumentową MongoDB.
-- `SERVICE_REQUEST_TIMEOUT_MS` pozwala ustawić timeout wywołań międzyserwisowych.
-- Gateway waliduje podstawowe dane wejściowe, obsługuje timeouty i zachowuje jednolity format błędów `{ error, code, details }`.
+## Migracje i seedy
 
-Publiczne grupy endpointów:
+Migracje i inicjalizacja są wykonywane przez kontenery aplikacyjne w `docker compose up --build`.
 
-- `POST /users`, `GET /users/:id`, `DELETE /users/:id`
-- `POST /conversations`, `GET /conversations/:id`, `GET /users/:userId/conversations`
-- `POST /conversations/:conversationId/members`, `GET /conversations/:conversationId/members`
-- `POST /conversations/:conversationId/messages`, `GET /conversations/:conversationId/messages`
-- `GET /conversations/:conversationId/messages/search`
-- `GET /analytics/messages-per-day`, `GET /analytics/messages-per-conversation`
+- Prisma: `pg-service` uruchamia `prisma migrate deploy`, więc relacyjny model działa na czystej bazie.
+- Knex migrations: `pg-service` uruchamia `knex migrate:latest` dla tabel pomocniczych, w tym modułu search audit i tabel Sequelize delivery/audit.
+- Knex seeds: `pg-service` uruchamia `knex seed:run` dla przykładowych danych domenowych.
+- MongoDB: `mongo-service` tworzy indeksy kolekcji `messages` przy starcie, m.in. `{ conversationId: 1, seq: 1 }`, indeks chronologiczny, tekstowy i idempotencyjny.
 
-Endpoint `GET /conversations/:conversationId/messages` wymaga `requesterId` w query albo nagłówka `X-User-Id`, sprawdza członkostwo w `pg-service`, używa cursorów `afterSeq`/`beforeSeq` na MongoDB przez `$gt`/`$lt` i zwraca wiadomości chronologicznie po `seq ASC` z domyślnym `limit=20` oraz maksimum `100`.
-Endpoint `GET /conversations/:conversationId/messages/search` również wymaga członkostwa i korzysta z indeksu tekstowego MongoDB na `body`; `limit` ma maksimum `50`.
+Ręczne komendy pomocnicze:
 
-## T8c Operacja Hybrydowa
+```bash
+npm run prisma:deploy --workspace @chat/pg-service
+npm run knex:migrate --workspace @chat/pg-service
+npm run knex:seed --workspace @chat/pg-service
+```
 
-`POST /conversations/:conversationId/messages` jest orkiestracją w `api-gateway`:
+## Endpointy
 
-- gateway waliduje `authorId`, `body`, długość treści i załączniki;
-- `pg-service` sprawdza istnienie konwersacji oraz członkostwo autora;
-- `pg-service` rezerwuje kolejny `seq` w transakcji PostgreSQL z `SELECT ... FOR UPDATE`;
-- `mongo-service` zapisuje dokument wiadomości w kolekcji `messages`;
-- `pg-service` finalizuje zapis przez `message_pointers` i aktualizację `lastMessageAt`;
-- jeśli finalizacja PostgreSQL nie powiedzie się po zapisie MongoDB, gateway wywołuje kompensacyjne `DELETE /internal/messages/:id` i próbuje anulować rezerwację `seq`;
-- test `npm run test:e2e:hybrid-message` sprawdza sukces, blokadę 403 bez członkostwa oraz kompensację.
+Publiczne endpointy API Gateway:
 
-## Reguły Domenowe
+### Health
 
-- Konwersacja `direct` musi mieć dokładnie dwóch uczestników i nie pozwala na dodawanie kolejnych członków.
-- Konwersacja `group` może mieć tytuł, wymaga co najmniej jednego uczestnika, a twórca zostaje administratorem.
-- Członków do grupy może dodawać tylko admin; brak uprawnień zwraca `403`, a duplikat członkostwa `409`.
-- Wiadomość może wysłać tylko członek konwersacji; brak członkostwa zwraca `403`.
-- Treść wiadomości może być pusta tylko wtedy, gdy podano załączniki; maksymalna długość treści to 2000 znaków.
-- Początkowy status dostarczenia wiadomości to `server_received`.
-- Usunięcie użytkownika jest realizowane jako soft delete przez `deletedAt`; historia wiadomości i członkostwa pozostają w bazie, a użytkownik jest oznaczony jako usunięty.
-- Jeśli `clientMessageId` jest podany, MongoDB wymusza unikalność `{ conversationId, authorId, clientMessageId }` tylko dla dokumentów z tym polem. Duplikat zwraca `409` z kodem `IDEMPOTENCY_CONFLICT`.
-- Test `npm run test:e2e:domain-rules` sprawdza reguły członkostwa, soft delete, direct z nadmiarem uczestników, wysyłkę bez członkostwa i idempotencję.
+- `GET /health`
 
-## Format błędów
+### Users
 
-Każdy serwis zwraca błędy API bez stack trace w formacie:
+- `POST /users`
+- `GET /users/:id`
+- `DELETE /users/:id`
+
+### Conversations
+
+- `POST /conversations`
+- `GET /conversations/:id`
+- `GET /users/:userId/conversations`
+- `POST /conversations/:conversationId/members`
+- `GET /conversations/:conversationId/members`
+
+### Messages
+
+- `POST /conversations/:conversationId/messages`
+- `GET /conversations/:conversationId/messages?requesterId=&afterSeq=&beforeSeq=&limit=`
+- `GET /conversations/:conversationId/messages/search?requesterId=&q=&limit=`
+
+`GET /conversations/:conversationId/messages` i search akceptują też nagłówek `X-User-Id` zamiast `requesterId`.
+
+### Analytics
+
+- `GET /analytics/messages-per-day?conversationId=&from=&to=`
+- `GET /analytics/messages-per-conversation?from=&to=`
+
+Endpointy techniczne używane do spełnienia wymagań, wystawiane przez serwisy domenowe:
+
+- `pg-service`: `GET /conversations/search`, `GET /pg/users/by-email`, `POST /pg/users-raw`, `POST /sequelize/receipts-with-audit`, `GET /sequelize/audit-logs/:conversationId`.
+- `mongo-service`: `POST /messages`, `GET /messages/:id`, `PATCH /messages/:id`, `DELETE /messages/:id`, `POST /drafts`, `GET /drafts/:id/with-activity`, `POST /activity-events`, `GET /activity-events/recent/:conversationId`.
+
+## OpenAPI
+
+Publikowalna specyfikacja publicznego API Gateway znajduje się w `openapi.yaml`.
+
+Specyfikacja opisuje endpointy publiczne gateway, przykładowe requesty/response i wspólny format błędów:
 
 ```json
 {
-  "error": "Route not found",
-  "code": "ROUTE_NOT_FOUND",
-  "details": null
+  "error": "...",
+  "code": "...",
+  "details": {}
 }
 ```
 
+## Testy
+
+Testy e2e/integracyjne używają `Jest` i `Supertest`, uderzają w publiczny `api-gateway` i korzystają z baz uruchomionych przez Docker Compose.
+
+Uruchomienie:
+
+```bash
+docker compose up --build
+npm run test
+npm run test:e2e
+```
+
+`npm run test` uruchamia główny zestaw krytycznych testów. `npm run test:e2e` uruchamia ten sam zestaw jawnie jako e2e.
+
+Dodatkowe smoke testy:
+
+```bash
+npm run test:e2e:hybrid-message
+npm run test:e2e:domain-rules
+npm run test:e2e:read-endpoints
+```
+
+Zakres testów obejmuje healthcheck, użytkowników, duplikat email, reguły grup i członkostwa, wysyłkę wiadomości, zapis dokumentu MongoDB i pointera PostgreSQL, odczyt z cursorami, kompensację operacji hybrydowej oraz endpoint analityczny `messages-per-day`.
+
+## Polityka usuwania użytkownika
+
+Usunięcie użytkownika jest realizowane jako soft delete przez pole `deletedAt`.
+
+- Rekord użytkownika pozostaje w PostgreSQL.
+- Historia wiadomości pozostaje w MongoDB.
+- Członkostwa w konwersacjach mogą pozostać w `conversation_members`.
+- Historyczne `message_pointers` nadal wskazują autora wiadomości.
+
 ## Bezpieczeństwo
 
-- Publiczne endpointy `api-gateway` mają walidację requestów przez `Zod`; błędy walidacji zwracają `400 VALIDATION_ERROR` w jednolitym formacie `{ error, code, details }`.
+- Publiczne endpointy `api-gateway` mają walidację requestów przez `Zod`; błędy walidacji zwracają `400 VALIDATION_ERROR`.
 - SQL injection jest ograniczane przez Prisma, Knex Query Builder oraz parametryzowane zapytania natywnego `pg` (`$1`, `$2`) bez sklejania wartości użytkownika z SQL.
 - NoSQL injection jest ograniczane przez walidację typów i dozwolonych pól wejściowych przed budowaniem filtrów MongoDB.
 - Globalne error handlery w `api-gateway`, `pg-service` i `mongo-service` nie zwracają stack trace do klienta.
 - Błędy PostgreSQL, Prisma, MongoDB i Mongoose są jawnie mapowane na HTTP, m.in. `PG_UNIQUE_VIOLATION`, `PRISMA_UNIQUE_CONSTRAINT`, `MONGO_DUPLICATE_KEY` i `MONGO_VALIDATION_ERROR`.
 - Wysyłka i odczyt wiadomości wymagają kontroli członkostwa konwersacji; brak członkostwa zwraca `403 NOT_MEMBER`, a brak uprawnień admina `403 NOT_ADMIN`.
-- Usunięcie użytkownika jest realizowane przez soft delete (`deletedAt`), więc historia wiadomości i członkostw pozostaje zachowana.
 - Ryzyko niespójności PostgreSQL/MongoDB przy zapisie wiadomości jest ograniczane kompensacją: jeśli finalizacja pointera w PostgreSQL nie powiedzie się po zapisie MongoDB, gateway usuwa dokument wiadomości z MongoDB i próbuje anulować rezerwację `seq`.
 
-## Przepływ danych
+## Reguły domenowe
 
-Docelowo klient wysyła żądania do `api-gateway`. Gateway komunikuje się HTTP z `pg-service` dla metadanych PostgreSQL oraz z `mongo-service` dla treści wiadomości, indeksów i agregacji MongoDB.
+- Konwersacja `direct` musi mieć dokładnie dwóch uczestników i nie pozwala na dodawanie kolejnych członków.
+- Konwersacja `group` wymaga co najmniej jednego uczestnika; twórca zostaje administratorem.
+- Członków do grupy może dodawać tylko admin; brak uprawnień zwraca `403 NOT_ADMIN`, a duplikat członkostwa `409`.
+- Wiadomość może wysłać tylko członek konwersacji; brak członkostwa zwraca `403 NOT_MEMBER`.
+- Treść wiadomości może być pusta tylko wtedy, gdy podano załączniki; maksymalna długość treści to 2000 znaków.
+- Początkowy status dostarczenia wiadomości to `server_received`.
+- Jeśli `clientMessageId` jest podany, MongoDB wymusza unikalność `{ conversationId, authorId, clientMessageId }` tylko dla dokumentów z tym polem. Duplikat zwraca `409 IDEMPOTENCY_CONFLICT`.
 
-## T2 Knex.js
+## Checklist wymagań
 
-`pg-service` używa Knex jako dodatkowego narzędzia obok Prisma:
+### T1 — sterownik `pg`
 
-- migracje Knex znajdują się w `services/pg-service/knex/migrations` i tworzą pomocniczy moduł `conversation_search_audit`;
-- seedy domenowe znajdują się w `services/pg-service/knex/seeds` i dodają przykładowych użytkowników, konwersacje oraz członkostwa;
-- `GET /conversations/search` buduje dynamiczne filtry przez Knex Query Builder, bez sklejania SQL stringów.
+- Singleton pool: `services/pg-service/src/db/pgPool.ts`.
+- Parametryzacja `$1`, `$2`: endpointy `GET /pg/users/by-email` i `POST /pg/users-raw` w `services/pg-service/src/routes/pgNative.ts`.
+- Mapowanie kodów PostgreSQL: `services/pg-service/src/errors/pgErrors.ts` obsługuje `23505`, `23503`, `23514`, `22P02`.
 
-Komendy:
+### T2 — Knex.js
 
-```bash
-npm run knex:migrate --workspace @chat/pg-service
-npm run knex:seed --workspace @chat/pg-service
-```
+- Migracje: `services/pg-service/knex/migrations`.
+- Minimum 2 migracje addytywne: `create_conversation_search_audit`, `add_conversation_search_audit_created_at_index`, plus migracja tabel Sequelize.
+- Seedy domenowe: `services/pg-service/knex/seeds/001_domain_seed.js`.
+- Dynamiczny `WHERE` bez sklejania SQL stringów: `GET /conversations/search` w `services/pg-service/src/routes/conversations.ts` używa Knex Query Builder.
 
-Przykład:
+### T3 — Sequelize v6
 
-```bash
-curl "http://localhost:3001/conversations/search?type=group&title=study&limit=10"
-```
+- Modele: `DeliveryReceipt` i `ConversationAuditLog` w `services/pg-service/src/modules/sequelize`.
+- Walidacje: status, action, metadata i reguła `readAt` w modelach Sequelize.
+- Relacje i `include`: `ConversationAuditLog.hasMany(DeliveryReceipt)`, endpoint `GET /sequelize/audit-logs/:conversationId`.
+- Hooki domenowe: timestampy delivery/read i normalizacja `action` do uppercase.
+- Managed transaction: `POST /sequelize/receipts-with-audit`.
 
-## T1 pg
+### T4 — Prisma
 
-`pg-service` używa natywnego sterownika `pg` w module `src/db/pgPool.ts`. Pool jest singletonem i korzysta z `DATABASE_URL`.
+- Modele relacyjne: `User`, `Conversation`, `ConversationMember`, `MessagePointer` w `services/pg-service/prisma/schema.prisma`.
+- Migracje Prisma: `services/pg-service/prisma/migrations`.
+- `prisma migrate deploy` działa na czystej bazie i jest uruchamiane w compose.
+- CRUD przez PrismaClient: endpointy użytkowników, konwersacji, członków i finalizacji wiadomości w `pg-service`.
+- `$queryRaw` tagged template: `GET /users/:userId/conversations` oraz rezerwacja `seq` z `SELECT ... FOR UPDATE`.
 
-Endpointy demonstracyjne:
+### T5 — MongoDB native driver
 
-- `GET /pg/users/by-email?email=raw@example.test`
-- `POST /pg/users-raw`
+- Singleton `MongoClient`: `services/mongo-service/src/db/mongoClient.ts`.
+- Zamknięcie połączenia przy `SIGINT`/`SIGTERM`: `services/mongo-service/src/index.ts`.
+- Zasób domenowy native driverem: kolekcja `messages` w `services/mongo-service/src/routes/messages.ts` i `internalMessages.ts`.
+- Operatory: `$gt`, `$lt`, `$text`, `$in`, `$set` w endpointach messages.
+- Indeksy: `services/mongo-service/src/db/messagesCollection.ts` tworzy indeks `{ conversationId: 1, seq: 1 }`, indeks tekstowy `body`, indeksy chronologiczne i partial unique dla `clientMessageId`.
 
-Zapytania używają parametrów PostgreSQL (`$1`, `$2`). Błędy SQLSTATE są mapowane do formatu `{ error, code, details }`, np. duplikat email zwraca `409` i `PG_UNIQUE_VIOLATION`.
+### T6 — Mongoose
 
-## T3 Sequelize v6
+- Schematy: `ActivityEvent` i `MessageDraft` w `services/mongo-service/src/models/mongoose`.
+- Custom validators: typ activity event, body draftu i rozmiar załącznika.
+- Subdokumenty: `MessageDraft.attachments`.
+- Pre hooki: `updatedAt` dla draftów i `createdAt` dla activity events.
+- Populate: `GET /drafts/:id/with-activity` używa `populate("lastActivityEvent")`.
+- Methods/statics: `MessageDraft.preview()` i `ActivityEvent.findRecentForConversation()`.
 
-`pg-service` używa Sequelize v6 w osobnym module domenowym delivery/audit, poza podstawową logiką Prisma:
+### T7 — Aggregation Pipeline
 
-- modele `DeliveryReceipt` i `ConversationAuditLog` znajdują się w `services/pg-service/src/modules/sequelize`;
-- tabele są tworzone przez migrację Knex `create_sequelize_delivery_audit_tables`;
-- `POST /sequelize/receipts-with-audit` tworzy audit log i delivery receipt w managed transaction;
-- `GET /sequelize/audit-logs/:conversationId` używa eager loading przez `include`;
-- hooki domenowe ustawiają timestampy delivery/read i normalizują `action` do uppercase.
+- `GET /analytics/messages-per-day` agreguje liczbę wiadomości per dzień.
+- `GET /analytics/messages-per-conversation` agreguje liczbę wiadomości per konwersacja.
+- Pipeline zawierają `$match`, `$group`, `$project`, `$sort`.
+- `$lookup` jest użyty w `messages-per-conversation` do kolekcji `activityevents`.
+- Pierwszy `$match` korzysta z indeksów `createdAt` albo `conversationId + createdAt`.
 
-## T5 MongoDB Native Driver
+### T8a — Konteneryzacja
 
-`mongo-service` używa natywnego sterownika MongoDB:
+- `docker-compose.yml` uruchamia `api-gateway`, `pg-service`, `mongo-service`, `postgres`, `mongo`.
+- Każdy serwis Node ma multi-stage `Dockerfile`.
+- Healthchecki są skonfigurowane dla baz i serwisów Node.
+- `depends_on` używa `condition: service_healthy`.
+- `.env.example` zawiera zmienne wymagane do uruchomienia.
 
-- singleton `MongoClient` znajduje się w `services/mongo-service/src/db/mongoClient.ts`;
-- połączenie jest zamykane przy `SIGINT` i `SIGTERM`;
-- kolekcja `messages` przechowuje treść wiadomości oraz zagnieżdżone metadane załączników;
-- indeksy `{ conversationId: 1, seq: 1 }`, `{ conversationId: 1, createdAt: -1 }`, `{ body: "text" }` i `{ authorId: 1, createdAt: -1 }` są tworzone przy starcie serwisu;
-- endpointy `POST /messages`, `GET /messages/:id`, `GET /conversations/:conversationId/messages`, `GET /messages/search`, `PATCH /messages/:id`, `DELETE /messages/:id` używają operatorów MongoDB `$gt`, `$lt`, `$text`, `$in` i `$set`.
+### T8b — Mikroserwisy
 
-## T6 Mongoose
+- Są 3 serwisy Node w osobnych kontenerach: `api-gateway`, `pg-service`, `mongo-service`.
+- Podział per silnik BD: `pg-service` dla PostgreSQL, `mongo-service` dla MongoDB.
+- Komunikacja HTTP między gateway i serwisami domenowymi.
+- API Gateway jest jedynym publicznym wejściem dla głównych endpointów REST.
+- Migracje i seedy są uruchamiane w compose.
 
-`mongo-service` używa Mongoose jako osobnego modułu domenowego, niezależnego od kolekcji `messages` obsługiwanej natywnym sterownikiem:
+### T8c — Architektura hybrydowa
 
-- schematy `ActivityEvent` i `MessageDraft` znajdują się w `services/mongo-service/src/models/mongoose`;
-- `MessageDraft.attachments` jest tablicą subdokumentów z walidacją rozmiaru pliku;
-- custom validators sprawdzają typ zdarzenia, treść draftu i rozmiar załączników;
-- pre hooki ustawiają `updatedAt` dla draftów i `createdAt` dla zdarzeń aktywności;
-- `MessageDraft.preview()` zwraca pierwsze 50 znaków treści;
-- `ActivityEvent.findRecentForConversation(conversationId, limit)` zwraca ostatnie zdarzenia;
-- `GET /drafts/:id/with-activity` używa `populate("lastActivityEvent")`.
+- Zapis wiadomości łączy MongoDB i PostgreSQL: dokument `messages` + `message_pointers` i `lastMessageAt/lastSeq`.
+- Kompensacja: przy błędzie finalizacji PostgreSQL gateway usuwa zapisany dokument z MongoDB.
+- Jednolity format błędów `{ error, code, details }` jest stosowany w każdym serwisie.
 
-## T7 Aggregation Pipeline
+## Wymagania specyficzne projektu
 
-`mongo-service` udostępnia endpointy analityczne wykonywane w MongoDB przez Aggregation Pipeline:
-
-- `GET /analytics/messages-per-day?conversationId=&from=&to=` zaczyna od `$match` po `conversationId` i `createdAt`, korzystając z indeksu `{ conversationId: 1, createdAt: -1 }`;
-- `GET /analytics/messages-per-conversation?from=&to=` zaczyna od `$match` po `createdAt`, korzystając z indeksu `{ createdAt: -1 }`;
-- pipeline używają `$match`, `$group`, `$project`, `$sort` oraz `$lookup`;
-- `$lookup` łączy wyniki z kolekcją `activityevents`, aby zwrócić `lastActivityType`;
-- agregacja jest wykonywana w bazie, bez pobierania wszystkich dokumentów do Node.js.
+- PostgreSQL: `users`, `conversations`, `conversation_members`, `message_pointers` są zdefiniowane w Prisma i migrowane przez `prisma migrate deploy`.
+- MongoDB: kolekcja `messages` zawiera `conversationId`, `authorId`, `seq`, `body`, timestampy, `deliveryStatus`, `attachments` i opcjonalny `clientMessageId`.
+- API conversations/messages: publiczne endpointy gateway obsługują tworzenie konwersacji, dodawanie członków, wysyłkę, listę, search i listę konwersacji użytkownika.
+- `403` bez członkostwa: wysyłka i odczyt wiadomości sprawdzają członkostwo przez `pg-service`.
+- Soft delete: `DELETE /users/:id` ustawia `deletedAt`, historia wiadomości zostaje.
+- Idempotencja: `clientMessageId` ma partial unique index `{ conversationId, authorId, clientMessageId }`; duplikat zwraca `409 IDEMPOTENCY_CONFLICT`.
+- Hybrydowy zapis wiadomości: `POST /conversations/:conversationId/messages` orkiestruje rezerwację `seq`, zapis MongoDB, finalizację PostgreSQL i kompensację.

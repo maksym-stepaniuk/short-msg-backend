@@ -22,4 +22,4 @@ COPY --from=builder /app/knex ./knex
 COPY --from=builder /app/knexfile.js ./knexfile.js
 COPY --from=builder /app/dist ./dist
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run knex:migrate && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run knex:migrate && npm run knex:seed && node dist/index.js"]
