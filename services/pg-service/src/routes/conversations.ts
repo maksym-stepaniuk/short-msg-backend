@@ -235,7 +235,7 @@ conversationsRouter.get(
     });
 
     if (!conversation) {
-      throw new HttpError(404, "CONVERSATION_NOT_FOUND", "Conversation not found");
+      throw new HttpError(404, "NOT_FOUND", "Conversation not found");
     }
 
     res.json(conversation);
@@ -256,7 +256,7 @@ conversationsRouter.post(
     });
 
     if (!conversation) {
-      throw new HttpError(404, "CONVERSATION_NOT_FOUND", "Conversation not found");
+      throw new HttpError(404, "NOT_FOUND", "Conversation not found");
     }
 
     if (conversation.type === "direct") {
@@ -276,7 +276,7 @@ conversationsRouter.post(
     });
 
     if (!requesterMembership || requesterMembership.role !== "admin") {
-      throw new HttpError(403, "ADMIN_REQUIRED", "Only group admin can add members");
+      throw new HttpError(403, "NOT_ADMIN", "Only group admin can add members");
     }
 
     const role = req.body.role === "admin" ? MemberRole.admin : MemberRole.member;

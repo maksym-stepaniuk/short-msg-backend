@@ -902,7 +902,7 @@ components:
           example: User is not a conversation member
         code:
           type: string
-          example: CONVERSATION_MEMBERSHIP_REQUIRED
+          example: NOT_MEMBER
         details:
           type: object
           nullable: true
@@ -933,7 +933,7 @@ components:
             forbidden:
               value:
                 error: User is not a conversation member
-                code: CONVERSATION_MEMBERSHIP_REQUIRED
+                code: NOT_MEMBER
                 details: null
     NotFound:
       description: Resource not found
@@ -945,7 +945,7 @@ components:
             notFound:
               value:
                 error: Resource not found
-                code: RESOURCE_NOT_FOUND
+                code: NOT_FOUND
                 details: null
     Conflict:
       description: Conflict, duplicate resource or idempotency conflict
@@ -957,7 +957,7 @@ components:
             conflict:
               value:
                 error: Unique constraint violation
-                code: UNIQUE_CONSTRAINT_VIOLATION
+                code: PRISMA_UNIQUE_CONSTRAINT
                 details:
                   target:
                     - email

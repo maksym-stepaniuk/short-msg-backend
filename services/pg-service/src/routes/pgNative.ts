@@ -34,7 +34,7 @@ pgNativeRouter.get(
     );
 
     if (!result.rows[0]) {
-      throw new HttpError(404, "USER_NOT_FOUND", "User not found");
+      throw new HttpError(404, "NOT_FOUND", "User not found");
     }
 
     res.json(result.rows[0]);

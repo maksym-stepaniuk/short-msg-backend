@@ -66,7 +66,7 @@ const main = async () => {
   });
 
   assert.equal(forbiddenResponse.status, 403);
-  assert.equal(forbiddenResponse.payload.code, "CONVERSATION_MEMBERSHIP_REQUIRED");
+  assert.equal(forbiddenResponse.payload.code, "NOT_MEMBER");
 
   const compensationResponse = await request(
     "POST",

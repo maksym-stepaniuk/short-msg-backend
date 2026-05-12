@@ -3,7 +3,7 @@ import { HttpError } from "./httpError";
 
 export const mapMongooseError = (err: unknown): HttpError | null => {
   if (err instanceof mongoose.Error.ValidationError) {
-    return new HttpError(400, "MONGOOSE_VALIDATION_ERROR", "Mongoose validation failed", {
+    return new HttpError(400, "MONGO_VALIDATION_ERROR", "Mongo validation failed", {
       fields: Object.keys(err.errors)
     });
   }

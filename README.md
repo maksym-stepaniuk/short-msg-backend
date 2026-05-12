@@ -100,6 +100,17 @@ Każdy serwis zwraca błędy API bez stack trace w formacie:
 }
 ```
 
+## Bezpieczeństwo
+
+- Publiczne endpointy `api-gateway` mają walidację requestów przez `Zod`; błędy walidacji zwracają `400 VALIDATION_ERROR` w jednolitym formacie `{ error, code, details }`.
+- SQL injection jest ograniczane przez Prisma, Knex Query Builder oraz parametryzowane zapytania natywnego `pg` (`$1`, `$2`) bez sklejania wartości użytkownika z SQL.
+- NoSQL injection jest ograniczane przez walidację typów i dozwolonych pól wejściowych przed budowaniem filtrów MongoDB.
+- Globalne error handlery w `api-gateway`, `pg-service` i `mongo-service` nie zwracają stack trace do klienta.
+- Błędy PostgreSQL, Prisma, MongoDB i Mongoose są jawnie mapowane na HTTP, m.in. `PG_UNIQUE_VIOLATION`, `PRISMA_UNIQUE_CONSTRAINT`, `MONGO_DUPLICATE_KEY` i `MONGO_VALIDATION_ERROR`.
+- Wysyłka i odczyt wiadomości wymagają kontroli członkostwa konwersacji; brak członkostwa zwraca `403 NOT_MEMBER`, a brak uprawnień admina `403 NOT_ADMIN`.
+- Usunięcie użytkownika jest realizowane przez soft delete (`deletedAt`), więc historia wiadomości i członkostw pozostaje zachowana.
+- Ryzyko niespójności PostgreSQL/MongoDB przy zapisie wiadomości jest ograniczane kompensacją: jeśli finalizacja pointera w PostgreSQL nie powiedzie się po zapisie MongoDB, gateway usuwa dokument wiadomości z MongoDB i próbuje anulować rezerwację `seq`.
+
 ## Przepływ danych
 
 Docelowo klient wysyła żądania do `api-gateway`. Gateway komunikuje się HTTP z `pg-service` dla metadanych PostgreSQL oraz z `mongo-service` dla treści wiadomości, indeksów i agregacji MongoDB.

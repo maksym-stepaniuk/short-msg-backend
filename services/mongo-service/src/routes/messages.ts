@@ -238,7 +238,7 @@ messagesRouter.get(
     const message = await collection.findOne({ _id });
 
     if (!message) {
-      throw new HttpError(404, "MESSAGE_NOT_FOUND", "Message not found");
+      throw new HttpError(404, "NOT_FOUND", "Message not found");
     }
 
     res.json(message);
@@ -321,7 +321,7 @@ messagesRouter.patch(
     );
 
     if (!result) {
-      throw new HttpError(404, "MESSAGE_NOT_FOUND", "Message not found");
+      throw new HttpError(404, "NOT_FOUND", "Message not found");
     }
 
     res.json(result);
@@ -336,7 +336,7 @@ messagesRouter.delete(
     const result = await collection.findOneAndDelete({ _id });
 
     if (!result) {
-      throw new HttpError(404, "MESSAGE_NOT_FOUND", "Message not found");
+      throw new HttpError(404, "NOT_FOUND", "Message not found");
     }
 
     res.json(result);

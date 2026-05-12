@@ -2,12 +2,23 @@ import { Router } from "express";
 import { pgServiceClient } from "../clients/pgServiceClient";
 import { HttpError } from "../errors/httpError";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { validateRequest } from "../middleware/validateRequest";
+import {
+  addMemberBodySchema,
+  conversationIdParamsSchema,
+  createConversationBodySchema,
+  idParamsSchema,
+  userIdParamsSchema
+} from "./schemas";
 import { requireObjectBody, requireString, requireUuid } from "./validators";
 
 export const conversationsRouter = Router();
 
 conversationsRouter.post(
   "/conversations",
+  validateRequest({
+    body: createConversationBodySchema
+  }),
   asyncHandler(async (req, res) => {
     const body = requireObjectBody(req.body);
     const type = requireString(body.type, "type");
@@ -35,6 +46,9 @@ conversationsRouter.post(
 
 conversationsRouter.get(
   "/conversations/:id",
+  validateRequest({
+    params: idParamsSchema
+  }),
   asyncHandler(async (req, res) => {
     requireUuid(req.params.id, "id");
 
@@ -48,6 +62,9 @@ conversationsRouter.get(
 
 conversationsRouter.get(
   "/users/:userId/conversations",
+  validateRequest({
+    params: userIdParamsSchema
+  }),
   asyncHandler(async (req, res) => {
     requireUuid(req.params.userId, "userId");
 
@@ -61,6 +78,10 @@ conversationsRouter.get(
 
 conversationsRouter.post(
   "/conversations/:conversationId/members",
+  validateRequest({
+    params: conversationIdParamsSchema,
+    body: addMemberBodySchema
+  }),
   asyncHandler(async (req, res) => {
     requireUuid(req.params.conversationId, "conversationId");
     const body = requireObjectBody(req.body);
@@ -79,6 +100,9 @@ conversationsRouter.post(
 
 conversationsRouter.get(
   "/conversations/:conversationId/members",
+  validateRequest({
+    params: conversationIdParamsSchema
+  }),
   asyncHandler(async (req, res) => {
     requireUuid(req.params.conversationId, "conversationId");
 

@@ -1,12 +1,17 @@
 import { Router } from "express";
 import { pgServiceClient } from "../clients/pgServiceClient";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { validateRequest } from "../middleware/validateRequest";
+import { createUserBodySchema, idParamsSchema } from "./schemas";
 import { requireObjectBody, requireString, requireUuid } from "./validators";
 
 export const usersRouter = Router();
 
 usersRouter.post(
   "/users",
+  validateRequest({
+    body: createUserBodySchema
+  }),
   asyncHandler(async (req, res) => {
     const body = requireObjectBody(req.body);
     const payload = {
@@ -26,6 +31,9 @@ usersRouter.post(
 
 usersRouter.get(
   "/users/:id",
+  validateRequest({
+    params: idParamsSchema
+  }),
   asyncHandler(async (req, res) => {
     requireUuid(req.params.id, "id");
 
@@ -39,6 +47,9 @@ usersRouter.get(
 
 usersRouter.delete(
   "/users/:id",
+  validateRequest({
+    params: idParamsSchema
+  }),
   asyncHandler(async (req, res) => {
     requireUuid(req.params.id, "id");
 

@@ -11,6 +11,14 @@ import {
   requireUuid
 } from "./validators";
 import { pgServiceClient } from "../clients/pgServiceClient";
+import { validateRequest } from "../middleware/validateRequest";
+import {
+  conversationIdParamsSchema,
+  listMessagesQuerySchema,
+  searchMessagesQuerySchema,
+  sendMessageBodySchema,
+  userIdHeaderSchema
+} from "./schemas";
 
 export const gatewayMessagesRouter = Router();
 
@@ -132,6 +140,10 @@ const cancelReservation = async (conversationId: string, seq: number) => {
 
 gatewayMessagesRouter.post(
   "/conversations/:conversationId/messages",
+  validateRequest({
+    params: conversationIdParamsSchema,
+    body: sendMessageBodySchema
+  }),
   asyncHandler(async (req, res) => {
     const body = requireObjectBody(req.body);
     const conversationId = requireUuid(requireString(req.params.conversationId, "conversationId"), "conversationId");
@@ -194,6 +206,11 @@ gatewayMessagesRouter.post(
 
 gatewayMessagesRouter.get(
   "/conversations/:conversationId/messages/search",
+  validateRequest({
+    params: conversationIdParamsSchema,
+    query: searchMessagesQuerySchema,
+    headers: userIdHeaderSchema
+  }),
   asyncHandler(async (req, res) => {
     const conversationId = requireUuid(requireString(req.params.conversationId, "conversationId"), "conversationId");
     const requesterId = parseRequesterId(req.query.requesterId, req.header("x-user-id"));
@@ -217,6 +234,11 @@ gatewayMessagesRouter.get(
 
 gatewayMessagesRouter.get(
   "/conversations/:conversationId/messages",
+  validateRequest({
+    params: conversationIdParamsSchema,
+    query: listMessagesQuerySchema,
+    headers: userIdHeaderSchema
+  }),
   asyncHandler(async (req, res) => {
     const conversationId = requireUuid(requireString(req.params.conversationId, "conversationId"), "conversationId");
     const requesterId = parseRequesterId(req.query.requesterId, req.header("x-user-id"));

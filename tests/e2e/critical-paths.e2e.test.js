@@ -72,7 +72,7 @@ describe("api-gateway critical e2e paths", () => {
     });
     expect(duplicate.status).toBe(409);
     expectErrorShape(duplicate.body);
-    expect(duplicate.body.code).toBe("UNIQUE_CONSTRAINT_VIOLATION");
+    expect(duplicate.body.code).toBe("PRISMA_UNIQUE_CONSTRAINT");
   });
 
   test("conversations: group admin rules and membership conflicts", async () => {
@@ -101,7 +101,7 @@ describe("api-gateway critical e2e paths", () => {
     });
     expect(nonAdminAdd.status).toBe(403);
     expectErrorShape(nonAdminAdd.body);
-    expect(nonAdminAdd.body.code).toBe("ADMIN_REQUIRED");
+    expect(nonAdminAdd.body.code).toBe("NOT_ADMIN");
 
     const duplicateMember = await api.post(`/conversations/${conversation.id}/members`).send({
       requesterId: admin.id,
@@ -109,7 +109,7 @@ describe("api-gateway critical e2e paths", () => {
     });
     expect(duplicateMember.status).toBe(409);
     expectErrorShape(duplicateMember.body);
-    expect(duplicateMember.body.code).toBe("UNIQUE_CONSTRAINT_VIOLATION");
+    expect(duplicateMember.body.code).toBe("PRISMA_UNIQUE_CONSTRAINT");
   });
 
   test("messages: member sends, Mongo document and PostgreSQL pointer are persisted", async () => {
@@ -168,7 +168,7 @@ describe("api-gateway critical e2e paths", () => {
     });
     expect(forbidden.status).toBe(403);
     expectErrorShape(forbidden.body);
-    expect(forbidden.body.code).toBe("CONVERSATION_MEMBERSHIP_REQUIRED");
+    expect(forbidden.body.code).toBe("NOT_MEMBER");
   });
 
   test("message reads: limit and afterSeq cursor work", async () => {

@@ -138,7 +138,7 @@ mongooseDomainRouter.get(
     const draft = await MessageDraft.findById(parseObjectId(req.params.id, "id")).exec();
 
     if (!draft) {
-      throw new HttpError(404, "DRAFT_NOT_FOUND", "Draft not found");
+      throw new HttpError(404, "NOT_FOUND", "Draft not found");
     }
 
     res.json({
@@ -156,7 +156,7 @@ mongooseDomainRouter.get(
       .exec();
 
     if (!draft) {
-      throw new HttpError(404, "DRAFT_NOT_FOUND", "Draft not found");
+      throw new HttpError(404, "NOT_FOUND", "Draft not found");
     }
 
     res.json({

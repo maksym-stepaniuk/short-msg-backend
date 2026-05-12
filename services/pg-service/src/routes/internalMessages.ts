@@ -56,7 +56,7 @@ internalMessagesRouter.post(
     });
 
     if (!conversation) {
-      throw new HttpError(404, "CONVERSATION_NOT_FOUND", "Conversation not found");
+      throw new HttpError(404, "NOT_FOUND", "Conversation not found");
     }
 
     const membership = await prisma.conversationMember.findUnique({
@@ -69,7 +69,7 @@ internalMessagesRouter.post(
     });
 
     if (!membership) {
-      throw new HttpError(403, "CONVERSATION_MEMBERSHIP_REQUIRED", "User is not a conversation member");
+      throw new HttpError(403, "NOT_MEMBER", "User is not a conversation member");
     }
 
     res.json({
@@ -94,7 +94,7 @@ internalMessagesRouter.post(
       `;
 
       if (!rows[0]) {
-        throw new HttpError(404, "CONVERSATION_NOT_FOUND", "Conversation not found");
+        throw new HttpError(404, "NOT_FOUND", "Conversation not found");
       }
 
       const nextSeq = rows[0].lastSeq + 1;

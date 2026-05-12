@@ -54,14 +54,14 @@ const main = async () => {
     userId: member.id
   });
   assert.equal(duplicateMember.status, 409);
-  assert.equal(duplicateMember.payload.code, "UNIQUE_CONSTRAINT_VIOLATION");
+  assert.equal(duplicateMember.payload.code, "PRISMA_UNIQUE_CONSTRAINT");
 
   const nonAdminAdd = await request("POST", `/conversations/${conversationId}/members`, {
     requesterId: member.id,
     userId: outsider.id
   });
   assert.equal(nonAdminAdd.status, 403);
-  assert.equal(nonAdminAdd.payload.code, "ADMIN_REQUIRED");
+  assert.equal(nonAdminAdd.payload.code, "NOT_ADMIN");
 
   const adminAdd = await request("POST", `/conversations/${conversationId}/members`, {
     requesterId: admin.id,
@@ -75,7 +75,7 @@ const main = async () => {
     attachments: []
   });
   assert.equal(forbiddenMessage.status, 403);
-  assert.equal(forbiddenMessage.payload.code, "CONVERSATION_MEMBERSHIP_REQUIRED");
+  assert.equal(forbiddenMessage.payload.code, "NOT_MEMBER");
 
   const attachmentOnlyMessage = await request("POST", `/conversations/${conversationId}/messages`, {
     authorId: admin.id,

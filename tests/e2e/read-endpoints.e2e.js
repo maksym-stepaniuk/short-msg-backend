@@ -81,7 +81,7 @@ const main = async () => {
     `/conversations/${conversationId}/messages?requesterId=${outsider.id}&limit=20`
   );
   assert.equal(forbiddenMessages.status, 403);
-  assert.equal(forbiddenMessages.payload.code, "CONVERSATION_MEMBERSHIP_REQUIRED");
+  assert.equal(forbiddenMessages.payload.code, "NOT_MEMBER");
 
   const search = await request(
     "GET",
@@ -95,7 +95,7 @@ const main = async () => {
     `/conversations/${conversationId}/messages/search?requesterId=${outsider.id}&q=needle`
   );
   assert.equal(forbiddenSearch.status, 403);
-  assert.equal(forbiddenSearch.payload.code, "CONVERSATION_MEMBERSHIP_REQUIRED");
+  assert.equal(forbiddenSearch.payload.code, "NOT_MEMBER");
 
   const conversations = await request("GET", `/users/${author.id}/conversations`);
   assert.equal(conversations.status, 200);

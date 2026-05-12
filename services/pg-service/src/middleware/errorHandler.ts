@@ -1,9 +1,24 @@
 import type { ErrorRequestHandler } from "express";
+import { ZodError } from "zod";
 import { HttpError } from "../errors/httpError";
 import { mapPgError } from "../errors/pgErrors";
 import { mapPrismaError } from "../errors/prismaErrors";
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      error: "Validation error",
+      code: "VALIDATION_ERROR",
+      details: {
+        issues: err.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      }
+    });
+    return;
+  }
+
   const pgError = mapPgError(err);
 
   if (pgError) {
