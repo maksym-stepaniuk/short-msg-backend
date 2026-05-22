@@ -1,16 +1,32 @@
 services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - public
+      - private
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-chat_backend}
       POSTGRES_USER: ${POSTGRES_USER:-chat_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chat_password}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - chat_network
+      - private
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -23,12 +39,10 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-chat_admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-chat_password}
       MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-chat_backend}
-    ports:
-      - "27017:27017"
     volumes:
       - mongo_data:/data/db
     networks:
-      - chat_network
+      - private
     healthcheck:
       test:
         [
@@ -49,10 +63,10 @@ services:
       NODE_ENV: production
       PG_SERVICE_PORT: ${PG_SERVICE_PORT:-3001}
       DATABASE_URL: ${DATABASE_URL:-postgresql://chat_user:chat_password@postgres:5432/chat_backend}
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     networks:
-      - chat_network
+      - private
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,10 +89,10 @@ services:
       NODE_ENV: production
       MONGO_SERVICE_PORT: ${MONGO_SERVICE_PORT:-3002}
       MONGO_URI: ${MONGO_URI:-mongodb://chat_admin:chat_password@mongo:27017/chat_backend?authSource=admin}
-    ports:
-      - "3002:3002"
+    expose:
+      - "3002"
     networks:
-      - chat_network
+      - private
     depends_on:
       mongo:
         condition: service_healthy
@@ -102,10 +116,10 @@ services:
       API_GATEWAY_PORT: ${API_GATEWAY_PORT:-3000}
       PG_SERVICE_URL: ${PG_SERVICE_URL:-http://pg-service:3001}
       MONGO_SERVICE_URL: ${MONGO_SERVICE_URL:-http://mongo-service:3002}
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     networks:
-      - chat_network
+      - private
     depends_on:
       pg-service:
         condition: service_healthy
@@ -128,5 +142,8 @@ volumes:
   mongo_data:
 
 networks:
-  chat_network:
+  public:
     driver: bridge
+  private:
+    driver: bridge
+    internal: true
