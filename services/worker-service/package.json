@@ -1,0 +1,10 @@
+{
+  "name": "@chat/worker-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "node --check src/index.js",
+    "start": "node src/index.js"
+  }
+}

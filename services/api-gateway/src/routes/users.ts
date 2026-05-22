@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pgServiceClient } from "../clients/pgServiceClient";
+import { enqueueWorkerJob } from "../clients/workerServiceClient";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { validateRequest } from "../middleware/validateRequest";
 import { createUserBodySchema, idParamsSchema } from "./schemas";
@@ -19,12 +20,23 @@ usersRouter.post(
       username: requireString(body.username, "username")
     };
 
-    const user = await pgServiceClient.request({
+    const user = await pgServiceClient.request<Record<string, unknown>>({
       method: "POST",
       path: "/users",
       body: payload
     });
 
+    const workerQueued = await enqueueWorkerJob({
+      id: `user-created-${String(user.id)}`,
+      type: "user.created",
+      payload: {
+        userId: user.id,
+        email: user.email,
+        username: user.username
+      }
+    });
+
+    res.setHeader("X-Worker-Job", workerQueued ? "queued" : "skipped");
     res.status(201).json(user);
   })
 );

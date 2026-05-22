@@ -25,6 +25,7 @@ Projekt jest zbudowany jako zestaw mikroserwisów Node.js/TypeScript uruchamiany
 - `api-gateway` — publiczne REST API, walidacja wejścia, orkiestracja operacji hybrydowej i komunikacja HTTP z serwisami domenowymi.
 - `pg-service` — PostgreSQL, Prisma, Knex.js, natywny sterownik `pg` oraz Sequelize v6.
 - `mongo-service` — MongoDB native driver, Mongoose, kolekcja `messages`, activity events, drafts i analytics.
+- `worker-service` — pomocniczy worker HTTP z prostą kolejką w pamięci; API Gateway wysyła do niego zdarzenie po utworzeniu użytkownika.
 - `postgres` — relacyjna baza metadanych: użytkownicy, konwersacje, członkostwa, wskaźniki wiadomości.
 - `mongo` — dokumentowa baza treści wiadomości, załączników i danych analitycznych.
 
@@ -37,8 +38,9 @@ Podział odpowiedzialności:
 ## Diagram przepływu
 
 ```text
-Client -> API Gateway -> pg-service    -> PostgreSQL
-Client -> API Gateway -> mongo-service -> MongoDB
+Client -> Nginx -> API Gateway -> pg-service     -> PostgreSQL
+Client -> Nginx -> API Gateway -> mongo-service  -> MongoDB
+Client -> Nginx -> API Gateway -> worker-service -> queued background jobs
 ```
 
 Zapis wiadomości:
@@ -59,7 +61,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Komenda uruchamia kontenery `nginx`, `api-gateway`, `pg-service`, `mongo-service`, `postgres` i `mongo` bez kroków ręcznych.
+Komenda uruchamia kontenery `nginx`, `api-gateway`, `pg-service`, `mongo-service`, `worker-service`, `postgres` i `mongo` bez kroków ręcznych.
 
 Ruch z hosta przechodzi wyłącznie przez reverse proxy Nginx. Usługi aplikacyjne i bazy danych działają tylko w prywatnej sieci Docker Compose.
 
@@ -69,6 +71,23 @@ Health endpointy:
 - `GET http://api-gateway:3000/health` — API Gateway, tylko w sieci prywatnej Compose
 - `GET http://pg-service:3001/health` — pg-service, tylko w sieci prywatnej Compose
 - `GET http://mongo-service:3002/health` — mongo-service, tylko w sieci prywatnej Compose
+- `GET http://worker-service:3003/health` — worker-service, tylko w sieci prywatnej Compose
+
+Szybka weryfikacja workera:
+
+```bash
+EMAIL="worker-check-$(date +%s)@example.test"
+curl -i -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"${EMAIL}\",\"username\":\"worker-check\"}"
+
+docker compose logs --tail=20 worker-service
+```
+
+Oczekiwany dowód działania:
+
+- odpowiedź `POST /users` ma nagłówek `X-Worker-Job: queued`;
+- log `worker-service` zawiera wpis podobny do `[worker] processed job type=user.created`.
 
 Czyszczenie danych lokalnych:
 
@@ -86,9 +105,12 @@ Zmienne są opisane w `.env.example`.
 | `API_GATEWAY_PORT` | Lokalny port `api-gateway`, domyślnie `3000`. |
 | `PG_SERVICE_PORT` | Lokalny port `pg-service`, domyślnie `3001`. |
 | `MONGO_SERVICE_PORT` | Lokalny port `mongo-service`, domyślnie `3002`. |
+| `WORKER_SERVICE_PORT` | Port prywatnego `worker-service`, domyślnie `3003`. |
 | `NGINX_PORT` | Publiczny port reverse proxy Nginx, domyślnie `8080`. |
 | `PG_SERVICE_URL` | Adres HTTP `pg-service` używany przez gateway. |
 | `MONGO_SERVICE_URL` | Adres HTTP `mongo-service` używany przez gateway. |
+| `WORKER_SERVICE_URL` | Adres HTTP `worker-service` używany przez gateway. |
+| `WORKER_REQUEST_TIMEOUT_MS` | Timeout wysyłki zdarzenia do workera. |
 | `SERVICE_REQUEST_TIMEOUT_MS` | Timeout wywołań międzyserwisowych gateway. |
 | `POSTGRES_DB` | Nazwa bazy PostgreSQL. |
 | `POSTGRES_USER` | Użytkownik PostgreSQL. |
