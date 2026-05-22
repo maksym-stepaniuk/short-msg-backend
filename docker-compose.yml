@@ -20,9 +20,11 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-chat_backend}
-      POSTGRES_USER: ${POSTGRES_USER:-chat_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chat_password}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -36,9 +38,11 @@ services:
   mongo:
     image: mongo:7
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-chat_admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-chat_password}
-      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-chat_backend}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?Set MONGO_INITDB_ROOT_USERNAME in .env}
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:?Set MONGO_INITDB_DATABASE in .env}
+    secrets:
+      - mongo_root_password
     volumes:
       - mongo_data:/data/db
     networks:
@@ -62,7 +66,18 @@ services:
     environment:
       NODE_ENV: production
       PG_SERVICE_PORT: ${PG_SERVICE_PORT:-3001}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://chat_user:chat_password@postgres:5432/chat_backend}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    secrets:
+      - postgres_password
+    command:
+      [
+        "sh",
+        "-c",
+        "export DATABASE_URL=\"postgresql://$${POSTGRES_USER}:$$(cat /run/secrets/postgres_password)@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}\" && npx prisma migrate deploy && npm run knex:migrate && npm run knex:seed && node dist/index.js"
+      ]
     expose:
       - "3001"
     networks:
@@ -88,7 +103,18 @@ services:
     environment:
       NODE_ENV: production
       MONGO_SERVICE_PORT: ${MONGO_SERVICE_PORT:-3002}
-      MONGO_URI: ${MONGO_URI:-mongodb://chat_admin:chat_password@mongo:27017/chat_backend?authSource=admin}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?Set MONGO_INITDB_ROOT_USERNAME in .env}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:?Set MONGO_INITDB_DATABASE in .env}
+      MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+    secrets:
+      - mongo_root_password
+    command:
+      [
+        "sh",
+        "-c",
+        "export MONGO_URI=\"mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$$(cat /run/secrets/mongo_root_password)@$${MONGO_HOST}:$${MONGO_PORT}/$${MONGO_INITDB_DATABASE}?authSource=admin\" && export MONGO_DATABASE=\"$${MONGO_INITDB_DATABASE}\" && node dist/index.js"
+      ]
     expose:
       - "3002"
     networks:
@@ -165,6 +191,12 @@ services:
 volumes:
   postgres_data:
   mongo_data:
+
+secrets:
+  postgres_password:
+    environment: POSTGRES_PASSWORD
+  mongo_root_password:
+    environment: MONGO_INITDB_ROOT_PASSWORD
 
 networks:
   public:

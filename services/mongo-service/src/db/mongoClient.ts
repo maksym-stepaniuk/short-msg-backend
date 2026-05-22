@@ -1,6 +1,10 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGO_URI ?? "mongodb://chat_admin:chat_password@localhost:27017/chat_backend?authSource=admin";
+const uri = process.env.MONGO_URI;
+
+if (!uri) {
+  throw new Error("MONGO_URI environment variable is required");
+}
 
 export const mongoClient = new MongoClient(uri);
 

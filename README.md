@@ -58,12 +58,19 @@ Client
 
 ```bash
 cp .env.example .env
+# ustaw w .env własne wartości POSTGRES_PASSWORD i MONGO_INITDB_ROOT_PASSWORD
 docker compose up --build
 ```
 
 Komenda uruchamia kontenery `nginx`, `api-gateway`, `pg-service`, `mongo-service`, `worker-service`, `postgres` i `mongo` bez kroków ręcznych.
 
 Ruch z hosta przechodzi wyłącznie przez reverse proxy Nginx. Usługi aplikacyjne i bazy danych działają tylko w prywatnej sieci Docker Compose.
+
+Hasła baz danych są przekazywane przez Docker Compose secrets:
+
+- `postgres_password` jest tworzony z wartości `POSTGRES_PASSWORD` z `.env`;
+- `mongo_root_password` jest tworzony z wartości `MONGO_INITDB_ROOT_PASSWORD` z `.env`;
+- `pg-service` i `mongo-service` budują connection stringi w czasie startu kontenera na podstawie sekretów z `/run/secrets`.
 
 Health endpointy:
 
@@ -114,14 +121,16 @@ Zmienne są opisane w `.env.example`.
 | `SERVICE_REQUEST_TIMEOUT_MS` | Timeout wywołań międzyserwisowych gateway. |
 | `POSTGRES_DB` | Nazwa bazy PostgreSQL. |
 | `POSTGRES_USER` | Użytkownik PostgreSQL. |
-| `POSTGRES_PASSWORD` | Hasło PostgreSQL. |
+| `POSTGRES_PASSWORD` | Hasło PostgreSQL używane jako źródło secret `postgres_password`. |
 | `POSTGRES_HOST` | Host PostgreSQL w sieci Docker. |
 | `POSTGRES_PORT` | Port PostgreSQL. |
-| `DATABASE_URL` | Connection string PostgreSQL używany przez Prisma, Knex, `pg` i Sequelize. |
 | `MONGO_INITDB_ROOT_USERNAME` | Użytkownik root MongoDB. |
-| `MONGO_INITDB_ROOT_PASSWORD` | Hasło root MongoDB. |
+| `MONGO_INITDB_ROOT_PASSWORD` | Hasło root MongoDB używane jako źródło secret `mongo_root_password`. |
 | `MONGO_INITDB_DATABASE` | Nazwa bazy MongoDB. |
-| `MONGO_URI` | Connection string MongoDB używany przez `mongo-service`. |
+| `MONGO_HOST` | Host MongoDB w sieci Docker. |
+| `MONGO_PORT` | Port MongoDB. |
+
+`DATABASE_URL` i `MONGO_URI` nie muszą być wpisywane w `.env` dla Docker Compose. Są składane wewnątrz kontenerów aplikacyjnych z wartości niepoufnych oraz sekretów.
 
 ## Migracje i seedy
 
