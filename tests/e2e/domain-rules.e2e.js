@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 
-const gatewayUrl = process.env.API_GATEWAY_URL ?? "http://localhost:3000";
+const gatewayUrl = process.env.API_GATEWAY_URL ?? "http://localhost:8080";
 
 const request = async (method, path, body) => {
   const response = await fetch(`${gatewayUrl}${path}`, {

@@ -1,6 +1,6 @@
 const request = require("supertest");
 
-const gatewayUrl = process.env.API_GATEWAY_URL ?? "http://localhost:3000";
+const gatewayUrl = process.env.API_GATEWAY_URL ?? "http://localhost:8080";
 const api = request(gatewayUrl);
 
 const unique = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
