@@ -96,6 +96,30 @@ Oczekiwany dowód działania:
 - odpowiedź `POST /users` ma nagłówek `X-Worker-Job: queued`;
 - log `worker-service` zawiera wpis podobny do `[worker] processed job type=user.created`.
 
+Weryfikacja trwałości danych:
+
+PostgreSQL i MongoDB używają named volumes `postgres_data` i `mongo_data`. Dane powinny przetrwać restart środowiska wykonany bez flagi `-v`.
+
+```bash
+EMAIL="persistence-check-$(date +%s)@example.test"
+curl -fsS -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"${EMAIL}\",\"username\":\"persistence-check\"}" \
+  -o /tmp/persistence-user.json
+
+USER_ID="$(node -e 'process.stdout.write(require("/tmp/persistence-user.json").id)')"
+
+docker compose down
+docker compose up -d
+
+curl -fsS "http://localhost:8080/users/${USER_ID}"
+```
+
+Oczekiwany dowód działania:
+
+- po `docker compose down && docker compose up -d` bez `-v` endpoint `GET /users/${USER_ID}` zwraca ten sam rekord;
+- dopiero `docker compose down -v` usuwa named volumes i dane testowe.
+
 Czyszczenie danych lokalnych:
 
 ```bash
