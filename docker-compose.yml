@@ -16,6 +16,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   postgres:
     image: postgres:16-alpine
@@ -34,6 +35,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   mongo:
     image: mongo:7
@@ -48,17 +50,11 @@ services:
     networks:
       - private
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mongosh",
-          "--quiet",
-          "--eval",
-          "db.adminCommand('ping').ok"
-        ]
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$$(cat /run/secrets/mongo_root_password)\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\""]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   pg-service:
     build:
@@ -96,6 +92,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   mongo-service:
     build:
@@ -133,6 +130,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   worker-service:
     build:
@@ -155,6 +153,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   api-gateway:
     build:
@@ -187,6 +186,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
 volumes:
   postgres_data:
