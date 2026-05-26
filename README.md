@@ -133,6 +133,7 @@ Zmienne są opisane w `.env.example`.
 | Zmienna | Opis |
 | --- | --- |
 | `NODE_ENV` | Tryb uruchomienia aplikacji. |
+| `APP_IMAGE_TAG` | Tag obrazów aplikacyjnych budowanych lokalnie, np. `1.0.0`, `2026-05-26` albo SHA commita. |
 | `API_GATEWAY_PORT` | Lokalny port `api-gateway`, domyślnie `3000`. |
 | `PG_SERVICE_PORT` | Lokalny port `pg-service`, domyślnie `3001`. |
 | `MONGO_SERVICE_PORT` | Lokalny port `mongo-service`, domyślnie `3002`. |
@@ -155,6 +156,24 @@ Zmienne są opisane w `.env.example`.
 | `MONGO_PORT` | Port MongoDB. |
 
 `DATABASE_URL` i `MONGO_URI` nie muszą być wpisywane w `.env` dla Docker Compose. Są składane wewnątrz kontenerów aplikacyjnych z wartości niepoufnych oraz sekretów.
+
+## Tagowanie obrazów
+
+Obrazy aplikacyjne budowane przez Compose mają tag ustawiany zmienną `APP_IMAGE_TAG`:
+
+- `short-msg-backend-api-gateway:${APP_IMAGE_TAG:-dev}`
+- `short-msg-backend-pg-service:${APP_IMAGE_TAG:-dev}`
+- `short-msg-backend-mongo-service:${APP_IMAGE_TAG:-dev}`
+- `short-msg-backend-worker-service:${APP_IMAGE_TAG:-dev}`
+
+Przykłady:
+
+```bash
+APP_IMAGE_TAG=1.0.0 docker compose build
+APP_IMAGE_TAG="$(git rev-parse --short HEAD)" docker compose build
+```
+
+Jeżeli `APP_IMAGE_TAG` nie jest ustawiony, Compose używa tagu `dev`.
 
 ## Ustawienia operacyjne Compose
 
