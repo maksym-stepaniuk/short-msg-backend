@@ -156,6 +156,19 @@ Zmienne są opisane w `.env.example`.
 
 `DATABASE_URL` i `MONGO_URI` nie muszą być wpisywane w `.env` dla Docker Compose. Są składane wewnątrz kontenerów aplikacyjnych z wartości niepoufnych oraz sekretów.
 
+## Ustawienia operacyjne Compose
+
+- Główne usługi mają limity `cpus` i `mem_limit` ustawione w `docker-compose.yml`.
+- Logi kontenerów używają sterownika `json-file` z rotacją `max-size=10m` i `max-file=3`.
+- Usługi mają `stop_grace_period`, a serwisy Node obsługują `SIGTERM`/`SIGINT` i domykają serwery oraz połączenia.
+- Profil narzędziowy `tools` uruchamia Adminer bez wpływu na podstawowy start projektu:
+
+```bash
+docker compose --profile tools up -d adminer
+```
+
+Adminer jest dostępny pod `http://localhost:8081` albo pod portem ustawionym przez `ADMINER_PORT`.
+
 ## Migracje i seedy
 
 Migracje i inicjalizacja są wykonywane przez kontenery aplikacyjne w `docker compose up --build`.

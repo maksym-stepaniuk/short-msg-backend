@@ -1,6 +1,24 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-limits: &app-limits
+  cpus: "0.50"
+  mem_limit: 256m
+
+x-db-limits: &db-limits
+  cpus: "0.75"
+  mem_limit: 512m
+
 services:
   nginx:
     image: nginx:1.27-alpine
+    cpus: "0.25"
+    mem_limit: 128m
+    logging: *default-logging
+    stop_grace_period: 10s
     ports:
       - "${NGINX_PORT:-8080}:80"
     volumes:
@@ -20,6 +38,9 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    <<: *db-limits
+    logging: *default-logging
+    stop_grace_period: 30s
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
@@ -39,6 +60,9 @@ services:
 
   mongo:
     image: mongo:7
+    <<: *db-limits
+    logging: *default-logging
+    stop_grace_period: 30s
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?Set MONGO_INITDB_ROOT_USERNAME in .env}
       MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
@@ -59,6 +83,9 @@ services:
   pg-service:
     build:
       context: ./services/pg-service
+    <<: *app-limits
+    logging: *default-logging
+    stop_grace_period: 20s
     environment:
       NODE_ENV: production
       PG_SERVICE_PORT: ${PG_SERVICE_PORT:-3001}
@@ -72,7 +99,7 @@ services:
       [
         "sh",
         "-c",
-        "export DATABASE_URL=\"postgresql://$${POSTGRES_USER}:$$(cat /run/secrets/postgres_password)@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}\" && npx prisma migrate deploy && npm run knex:migrate && npm run knex:seed && node dist/index.js"
+        "export DATABASE_URL=\"postgresql://$${POSTGRES_USER}:$$(cat /run/secrets/postgres_password)@$${POSTGRES_HOST}:$${POSTGRES_PORT}/$${POSTGRES_DB}\" && npx prisma migrate deploy && npm run knex:migrate && npm run knex:seed && exec node dist/index.js"
       ]
     expose:
       - "3001"
@@ -97,6 +124,9 @@ services:
   mongo-service:
     build:
       context: ./services/mongo-service
+    <<: *app-limits
+    logging: *default-logging
+    stop_grace_period: 20s
     environment:
       NODE_ENV: production
       MONGO_SERVICE_PORT: ${MONGO_SERVICE_PORT:-3002}
@@ -110,7 +140,7 @@ services:
       [
         "sh",
         "-c",
-        "export MONGO_URI=\"mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$$(cat /run/secrets/mongo_root_password)@$${MONGO_HOST}:$${MONGO_PORT}/$${MONGO_INITDB_DATABASE}?authSource=admin\" && export MONGO_DATABASE=\"$${MONGO_INITDB_DATABASE}\" && node dist/index.js"
+        "export MONGO_URI=\"mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$$(cat /run/secrets/mongo_root_password)@$${MONGO_HOST}:$${MONGO_PORT}/$${MONGO_INITDB_DATABASE}?authSource=admin\" && export MONGO_DATABASE=\"$${MONGO_INITDB_DATABASE}\" && exec node dist/index.js"
       ]
     expose:
       - "3002"
@@ -135,6 +165,10 @@ services:
   worker-service:
     build:
       context: ./services/worker-service
+    cpus: "0.25"
+    mem_limit: 128m
+    logging: *default-logging
+    stop_grace_period: 10s
     environment:
       NODE_ENV: production
       WORKER_SERVICE_PORT: ${WORKER_SERVICE_PORT:-3003}
@@ -158,6 +192,9 @@ services:
   api-gateway:
     build:
       context: ./services/api-gateway
+    <<: *app-limits
+    logging: *default-logging
+    stop_grace_period: 15s
     environment:
       NODE_ENV: production
       API_GATEWAY_PORT: ${API_GATEWAY_PORT:-3000}
@@ -187,6 +224,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  adminer:
+    image: adminer:4.8.1
+    profiles:
+      - tools
+    cpus: "0.25"
+    mem_limit: 128m
+    logging: *default-logging
+    stop_grace_period: 10s
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    networks:
+      - public
+      - private
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

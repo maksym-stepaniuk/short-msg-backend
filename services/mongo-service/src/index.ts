@@ -5,9 +5,10 @@ import { closeMongoose, connectMongoose } from "./db/mongoose";
 
 const port = Number(process.env.MONGO_SERVICE_PORT ?? 3002);
 const app = createApp();
+let server: ReturnType<typeof app.listen> | undefined;
 
 Promise.all([ensureMessageIndexes(), connectMongoose()]).then(() => {
-  app.listen(port, () => {
+  server = app.listen(port, () => {
     console.log(`mongo-service listening on port ${port}`);
   });
 }).catch((err) => {
@@ -16,9 +17,18 @@ Promise.all([ensureMessageIndexes(), connectMongoose()]).then(() => {
 });
 
 const shutdown = async () => {
-  await closeMongoose();
-  await closeMongo();
-  process.exit(0);
+  const closeConnections = async () => {
+    await closeMongoose();
+    await closeMongo();
+    process.exit(0);
+  };
+
+  if (server) {
+    server.close(closeConnections);
+    return;
+  }
+
+  await closeConnections();
 };
 
 process.on("SIGINT", shutdown);

@@ -7,16 +7,18 @@ import { sequelize } from "./modules/sequelize/sequelize";
 const port = Number(process.env.PG_SERVICE_PORT ?? 3001);
 const app = createApp();
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`pg-service listening on port ${port}`);
 });
 
 const shutdown = async () => {
-  await sequelize.close();
-  await pgPool.end();
-  await knexDb.destroy();
-  await prisma.$disconnect();
-  process.exit(0);
+  server.close(async () => {
+    await sequelize.close();
+    await pgPool.end();
+    await knexDb.destroy();
+    await prisma.$disconnect();
+    process.exit(0);
+  });
 };
 
 process.on("SIGINT", shutdown);
